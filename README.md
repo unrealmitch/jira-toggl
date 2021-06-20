@@ -1,15 +1,15 @@
-[![Build Status](https://travis-ci.org/simoneldevig/jira-toggl.svg?branch=master)](https://travis-ci.org/simoneldevig/jira-toggl)
-
 <img src="src/icons/jira-toggl_128.png" alt="HeadRest" width="128"/>
 
-# Jira Toggl
+# Jira 2 Toggl
 
 A web extension for syncing Toggl timelog entries to your Jira Software worklog.
 
+Based in [@Simoneldevig jira-toggl](https://github.com/simoneldevig/jira-toggl)
+
 ## How it looks
 
-### Popup
-![Popup](jira-toggl-popup.png)
+### Popup (Dark Theme)
+![Popup](jira-toggl-dark-theme.png)
 
 ### Settings
 ![Popup](jira-toggl-settings.png)

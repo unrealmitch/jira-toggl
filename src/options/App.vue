@@ -13,6 +13,7 @@
     <div class="inner-container">
       <div class="md-layout md-gutter">
         <div class="md-layout-item md-size-100">
+          <h3>Credentials</h3>
           <md-field>
             <label>Jira Server url (https://jira.atlassian.net)</label>
             <md-input v-model="jiraUrl" />
@@ -21,6 +22,11 @@
             <label>Jira email</label>
             <md-input v-model="jiraEmail" />
           </md-field>
+          <md-field>
+            <label>Toggl API token</label>
+            <md-input v-model="togglApiToken" />
+          </md-field>
+          <br>
           <h3>Options</h3>
           <md-checkbox v-model="jiraMerge">Merge time entries with same comment</md-checkbox>
           <!-- <md-checkbox v-model="allowNumbersInId">Allow numbers in Project ID</md-checkbox> -->
@@ -28,31 +34,22 @@
           <md-checkbox v-model="worklogWihtoutDescription">Don't include Issue ID in worklog</md-checkbox><br>
           <md-checkbox v-model="worklogDescriptionSplit">Split worklog description from first occurrence of:</md-checkbox>
           <input v-model="stringSplit" placeholder="Searched string to split" style="contain: content;">
+          <br><br>
+          <h3>Extra Options</h3>
+          <md-checkbox v-model="saveDates">Save dates (Persistent start and end dates)</md-checkbox><br>
+          <md-checkbox v-model="weekdayMonday">Start week on monday</md-checkbox><br>
+          <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox>
           <md-field>
-            <label>Toggl API token</label>
-            <md-input v-model="togglApiToken" />
+            <label>URL Jira Plugin</label>
+            <md-input v-model="jiraPlugin" />
           </md-field>
+
           <div class="button__container">
             <md-button class="md-raised md-accent button__item" @click="saveSettings">
               <span v-show="!isSaving">Save settings</span>
               <span v-show="isSaving">Saving...</span>
             </md-button>
           </div>
-          <br>
-          <h3>Extra Options</h3>
-          <md-checkbox v-model="saveDates">Save dates (Persistent start and end dates)</md-checkbox><br>
-          <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox>
-          <md-field>
-            <label>URL Jira Plugin</label>
-            <md-input v-model="jiraPlugin" />
-          </md-field>
-          <!-- <br><label>Start weekday:</label>
-          <b-form-select v-model="weekday" :options="weekdays"></b-form-select>
-          <select v-model="weekday">
-            <option v-for="option in weekdays" :value="option.text">
-              {{ option.text }}
-            </option>
-          </select> -->
           <md-snackbar :md-active.sync="showSnackbar" md-persistent>
             <span>Your settings have now been saved ✌️</span>
           </md-snackbar>
@@ -70,10 +67,10 @@ export default {
     return {
       jiraUrl: '',
       jiraEmail: '',
-      jiraMerge: true,
+      jiraMerge: false,
       jiraIssueInDescription: true,
       worklogWihtoutDescription: true,
-      worklogDescriptionSplit: true,
+      worklogDescriptionSplit: false,
       allowNumbersInId: true,
       clockworkEnabled: false,
       stringSplit: ':',
@@ -81,13 +78,8 @@ export default {
       isSaving: false,
       showSnackbar: false,
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
-      weekday: 0,
-      saveDates: false,
-      weekdays: [
-        { value: 0, text: 'Sunday' },
-        { value: 1, text: 'Monday' },
-        { value: 6, text: 'Saturday' }
-      ]
+      weekdayMonday: true,
+      saveDates: false
     };
   },
   created () {
@@ -96,16 +88,16 @@ export default {
     browser.storage.sync.get({
       jiraUrl: '',
       jiraEmail: '',
-      jiraMerge: true,
+      jiraMerge: false,
       jiraIssueInDescription: true,
       worklogWihtoutDescription: true,
-      worklogDescriptionSplit: true,
+      worklogDescriptionSplit: false,
       allowNumbersInId: true,
       clockworkEnabled: false,
       stringSplit: ':',
       togglApiToken: '',
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
-      weekday: 0,
+      weekdayMonday: true,
       saveDates: false
     }).then((setting) => {
       _self.jiraUrl = setting.jiraUrl;
@@ -119,7 +111,7 @@ export default {
       _self.stringSplit = setting.stringSplit;
       _self.togglApiToken = setting.togglApiToken;
       _self.jiraPlugin = setting.jiraPlugin;
-      _self.weekday = setting.weekday;
+      _self.weekdayMonday = setting.weekdayMonday;
       _self.saveDates = setting.saveDates;
     });
   },
@@ -140,7 +132,7 @@ export default {
         stringSplit: _self.stringSplit,
         togglApiToken: _self.togglApiToken,
         jiraPlugin: _self.jiraPlugin,
-        weekday: _self.weekday,
+        weekdayMonday: _self.weekdayMonday,
         saveDates: _self.saveDates
       }).then(() => {
         _self.isSaving = false;

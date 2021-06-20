@@ -16,6 +16,10 @@
             <md-button class="md-icon-button" @click="refreshEntries">
               <md-icon>autorenew</md-icon>
             </md-button>
+            <md-button @click="toggleTheme" class="md-icon-button">
+                <md-icon v-if="this.theme == 'darkMode'">light_mode</md-icon>
+                <md-icon v-else>dark_mode</md-icon>     
+            </md-button>
             <a href="../options/options.html" target="_blank">
               <md-button class="md-icon-button">
                 <md-icon>settings</md-icon>
@@ -37,7 +41,7 @@
 
         <div class="md-layout-item">
           <span class="datepicker-label md-caption">Start date</span>
-          <md-datepicker v-model="startDate" start-weekday="2" md-immediately monday-first/>
+          <md-datepicker v-model="startDate" :readonly="blockFetch" md-immediately />
         </div>
         <div class="md-layout-item">
           <span class="datepicker-label md-caption">End date</span>
@@ -88,10 +92,14 @@
               <md-table-cell />
               <md-table-cell class="no-wrap"><b>TOTAL</b></md-table-cell>
               <md-table-cell class="no-wrap">
-                <i>{{ totalDuration(true) }}</i>
+                <div class="tooltip"><i>{{ totalDuration(true) }}</i>
+                  <span class="tooltiptext">Time in Jira</span>
+                </div>
               </md-table-cell>
               <md-table-cell class="no-wrap">
-                <b>{{ totalDuration() }}</b>
+                <div class="tooltip"><n>{{ totalDuration() }}</n>
+                  <span class="tooltiptext">Time in Toggl</span>
+                </div>
               </md-table-cell>
               <md-table-cell class="no-wrap" />
             </md-table-row>
@@ -146,8 +154,9 @@ export default {
       isSaving: false,
       showSnackbar: false,
       blockFetch: false,
-      weekday: 0,
-      saveDates: false
+      weekdayMonday: true,
+      saveDates: false,
+      theme: ''
     };
   },
   watch: {
@@ -178,7 +187,7 @@ export default {
         stringSplit: ':',
         togglApiToken: '',
         jiraPlugin: '',
-        weekday: 0,
+        weekdayMonday: true,
         startDate: initalStartDate,
         endDate: initalEndDate,
         saveDates: false
@@ -195,13 +204,18 @@ export default {
         _self.stringSplit = setting.stringSplit;
         _self.togglApiToken = setting.togglApiToken;
         _self.jiraPlugin = setting.jiraPlugin;
-        _self.weekday = setting.weekday;
+        _self.weekdayMonday = setting.weekdayMonday;
         _self.saveDates = setting.saveDates;
         if(_self.saveDates){
           _self.startDate = setting.startDate;
           _self.endDate = setting.endDate;
         }
+        this.$material.locale.firstDayOfAWeek = _self.weekdayMonday;
       });
+  },mounted() {
+    let localTheme = localStorage.getItem('theme'); //gets stored theme value if any
+    document.documentElement.setAttribute('data-theme', localTheme); // updates the data-theme attribute
+    this.theme = localTheme;
   },
   methods: {
     refreshEntries () {
@@ -521,6 +535,11 @@ export default {
       }).then(() => {
         _self.isSaving = false;
       });
+    },
+    toggleTheme() {
+      this.theme = this.theme == 'darkMode' ? '' : 'darkMode';
+      document.documentElement.setAttribute('data-theme', this.theme);
+      localStorage.setItem('theme', this.theme);
     }
   }
 };
@@ -623,5 +642,182 @@ img {
   overflow: hidden;
   right: 5px;
   margin-top: 5px;
+}
+
+/* ToolTip*/
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 150px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -75px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Theme Part */
+
+body{
+  color: var(--md-theme-default-primary, black);  
+}
+
+* {
+  color: var(--md-theme-default-primary, black);  
+}
+
+table {
+  background-color: var(--md-theme-default-background, white);
+}
+
+.md-icon{
+  /* -webkit-text-fill-color: var(--md-theme-default-background-3, black); */
+}
+
+.md-icon.md-theme-default.md-icon-image svg{
+  fill: var(--md-theme-default-primary, black);
+}
+
+.md-icon.md-theme-default.md-icon-font{
+  color: var(--md-theme-default-primary, black);  
+}
+
+svg{
+  fill: var(--md-theme-default-primary, black);
+}
+
+.md-input, .md-field.md-theme-default.md-has-value .md-textarea{
+  -webkit-text-fill-color: var(--md-theme-default-background-3, black) !important;
+}
+
+.md-field.md-theme-default:after{
+  background-color: var(--md-theme-default-background-4, black);
+}
+
+.md-checkbox.md-theme-default .md-checkbox-container{
+  border-color: var(--md-theme-default-background-4, black);
+}
+
+.md-checkbox.md-theme-default.md-disabled .md-checkbox-container{
+  border-color: var(--md-theme-default-background-5, black);
+}
+
+.inner-container {
+  background-color: var(--md-theme-default-background, white);
+}
+.container {
+  background-color: var(--md-theme-default-background, white);
+}
+
+.md-toolbar.md-theme-default{
+  background-color: var(--md-theme-default-background-2, white);
+}
+
+.md-title{
+  /*--md-theme-default-text-primary-on-background-variant*/
+  color: var(--md-theme-default-primary, black) !important;
+}
+
+.datepicker-label{
+  color: var(--md-theme-default-background-4, black) !important;
+}
+
+.md-datepicker-dialog.md-theme-default .md-datepicker-header{
+  background-color: var(--md-theme-default-accent-on-background, #448aff);
+}
+
+.md-datepicker-dialog.md-theme-default .md-datepicker-day-button.md-datepicker-selected{
+  background-color: var(--md-theme-default-accent-on-background, #448aff);
+}
+
+.md-datepicker-dialog.md-theme-default .md-datepicker-body-footer{
+  /*--md-theme-default-background*/
+  background-color: var(--md-theme-default-background-2, white);
+}
+
+.md-datepicker-body-content{
+  background-color: var(--md-theme-default-background-2, white);
+}
+
+.md-datepicker-dialog.md-theme-default .md-datepicker-body-header:before{
+  background-color: var(--md-theme-default-background-2, white);
+}
+
+.md-datepicker-dialog.md-theme-default .md-datepicker-body-header:after{
+  background-color: var(--md-theme-default-background-2, white);
+}
+
+.md-datepicker-year-select, .md-datepicker-dayname, .md-datepicker-monthname, .md-datepicker-day {
+  color: white;
+}
+
+.md-button.md-theme-default.md-raised[disabled]{
+  background-color:rgba(150, 150, 150, 0.15);
+}
+
+.md-toolbar.md-theme-default .md-icon{
+  color: var(--md-theme-default-background-3, black);
+  -webkit-text-fill-color: var(--md-theme-default-background-3, black);
+}
+
+:root {
+    /* --primary-color: #302AE6;
+    --secondary-color: #536390;
+    --font-color: #424242;
+    --bg-color: #fff;
+    --heading-color: #292922; */
+    --md-theme-default-primary: black;
+    --md-theme-default-primary-transparent: rgba(255, 255, 255, 0.85);
+    --md-theme-default-background: white;
+    --md-theme-default-background-2: white;
+    --md-theme-default-background-3: rgba(0, 0, 0, 0.85);
+    --md-theme-default-background-4: rgba(0, 0, 0, 0.5);
+    --md-theme-default-background-5: rgba(0, 0, 0, 0.20);
+    --md-theme-default-accent-on-background: #ff5252;
+}
+
+[data-theme="darkMode"] {
+    /* --primary-color: #9A97F3;
+    --secondary-color: #818cab;
+    --font-color: #e1e1ff;
+    --bg-color: #161625;
+    --heading-color: #818cab; */
+    --md-theme-default-primary: white;
+    --md-theme-default-primary-transparent: rgba(0, 0, 0, 0.85);
+    --md-theme-default-background: #1d1d1d;
+    --md-theme-default-background-2: #272727;
+    --md-theme-default-background-3: rgba(255, 255, 255, 0.85);
+    --md-theme-default-background-4: rgba(255, 255, 255, 0.5);
+    --md-theme-default-background-5: rgba(255, 255, 255, 0.20);
+    --md-theme-default-accent-on-background: #ff5252;
 }
 </style>
