@@ -1,6 +1,6 @@
 <img src="src/icons/jira-toggl_128.png" alt="HeadRest" width="128"/>
 
-# Jira 2 Toggl
+# Toggl To Jira
 
 A web extension for syncing Toggl timelog entries to your Jira Software worklog.
 

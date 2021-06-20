@@ -5,7 +5,7 @@
         <md-toolbar md-elevation="0">
           <div class="md-layout md-alignment-center-left">
             <img src="/icons/jira-toggl_48.png" alt="Avatar">
-            <h3 class="md-title">Jira Toggl</h3>
+            <h3 class="md-title">Toggl To Jira</h3>
           </div>
           <div class="md-toolbar-section-end">
             <a v-if="clockworkEnabled" :href="clockworkUrl()" target="_blank">
