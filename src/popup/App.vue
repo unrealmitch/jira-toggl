@@ -120,7 +120,7 @@
       </md-snackbar>
     </div>
     <md-toolbar v-if="errorMessage" class="md-accent error-message md-layout md-alignment-center-center">
-      <p>{{ errorMessage }}</p>
+      <p class="error-msg">{{ errorMessage }}</p>
     </md-toolbar>
   </div>
 </template>
@@ -606,6 +606,11 @@ export default {
   font-size: 16px;
   position: absolute;
   bottom: 0;
+  
+}
+
+.error-msg{
+    color: white !important;
 }
 
 .md-field.md-focused .md-input,
@@ -643,6 +648,12 @@ img {
   overflow: hidden;
   right: 5px;
   margin-top: 5px;
+}
+
+.md-toolbar.md-theme-default.md-accent{
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 /* ToolTip*/
@@ -804,6 +815,7 @@ svg{
     --md-theme-default-background-4: rgba(0, 0, 0, 0.5);
     --md-theme-default-background-5: rgba(0, 0, 0, 0.20);
     --md-theme-default-accent-on-background: #ff5252;
+    --md-theme-default-divider-on-background: rgba(0,0,0,0.12);
 }
 
 [data-theme="darkMode"] {
@@ -820,5 +832,6 @@ svg{
     --md-theme-default-background-4: rgba(255, 255, 255, 0.5);
     --md-theme-default-background-5: rgba(255, 255, 255, 0.20);
     --md-theme-default-accent-on-background: #ff5252;
+    --md-theme-default-divider-on-background: rgba(255,255,255,0.12);
 }
 </style>
