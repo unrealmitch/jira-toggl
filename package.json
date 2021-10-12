@@ -1,6 +1,6 @@
 {
   "name": "toggl2jira",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Web extension that sync Toggl Time records to Jira Worklogs",
   "author": "UnrealMitch <unrealmitch@gmail.com>",
   "scripts": {
@@ -17,11 +17,11 @@
     "Simon Eldevig <simoneldevig@gmail.com>"
   ],
   "dependencies": {
-    "axios": "^0.19.2",
-    "moment": "^2.29.1",
+    "axios": "^0.21.2",
     "vue": "^2.6.14",
-    "vue-material": "^1.0.0-beta-15",
-    "webextension-polyfill": "^0.3.1"
+    "webextension-polyfill": "^0.3.1",
+    "moment": "^2.24.0",
+    "vue-material": "^1.0.0-beta-15"
   },
   "devDependencies": {
     "@babel/core": "^7.14.6",
