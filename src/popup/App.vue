@@ -158,7 +158,11 @@ export default {
       blockFetch: false,
       weekdayMonday: true,
       saveDates: false,
-      theme: ''
+      theme: '',
+      manicTimeEnabled: false,
+      manicTimeServer: '',
+      manicTimeToken: '',
+      manicTimeTimeline: '',
     };
   },
   watch: {
@@ -192,7 +196,11 @@ export default {
         weekdayMonday: true,
         startDate: initalStartDate,
         endDate: initalEndDate,
-        saveDates: false
+        saveDates: false,
+        manicTimeEnabled: false,
+        manicTimeServer: '',
+        manicTimeToken: '',
+        manicTimeTimeline: '',
       })
       .then((setting) => {
         _self.jiraUrl = setting.jiraUrl;
@@ -213,6 +221,10 @@ export default {
           _self.endDate = setting.endDate;
         }
         this.$material.locale.firstDayOfAWeek = _self.weekdayMonday;
+        _self.manicTimeEnabled = setting.manicTimeEnabled;
+        _self.manicTimeServer = setting.manicTimeServer;
+        _self.manicTimeToken = setting.manicTimeToken;
+        _self.manicTimeTimeline = setting.manicTimeTimeline;
       });
   },mounted() {
     let localTheme = localStorage.getItem('theme'); //gets stored theme value if any
@@ -272,6 +284,9 @@ export default {
           .catch(function (error) {
             _self.errorMessage = error;
           });
+          
+        if(_self.manicTimeEnabled)
+            _self.pushLogToManicTime(log);
         if (!_self.jiraMerge) {
           await promise;
         }
@@ -381,8 +396,10 @@ export default {
             .then(function (issue) {
               const parsedIssue = _self.matchIssueId(issue.data.data.name);
               if (parsedIssue) {
+                log.projectID = parsedIssue[0];
                 resolve(parsedIssue[0]);
               } else {
+                log.projectID = null;
                 reject(log);
               }
             });
@@ -390,6 +407,36 @@ export default {
           reject(log);
         }
       });
+    },
+    getDescriptionID(log){
+      if(log.description != null && log.description != ''){
+        const parsedIssue = _self.matchIssueId(log.description);
+        if (parsedIssue) {
+          return parsedIssue[0];
+        }
+      }
+      return null;
+    },
+    getProjectID(log){
+      if (typeof log.pid !== 'undefined') {
+        axios
+          .get('https://www.toggl.com/api/v8/projects/' + log.pid, {
+            headers: {
+              Authorization:
+                'Basic ' + btoa(_self.togglApiToken + ':api_token')
+            }
+          })
+          .then(function (issue) {
+            const parsedIssue = _self.matchIssueId(issue.data.data.name);
+            if (parsedIssue) {
+              resolve(parsedIssue[0]);
+            } else {
+              reject(log);
+            }
+          });
+      } else {
+        reject(log);
+      }
     },
     fetchEntries () {
       let _self = this;
@@ -550,6 +597,43 @@ export default {
       this.theme = this.theme == 'darkMode' ? '' : 'darkMode';
       document.documentElement.setAttribute('data-theme', this.theme);
       localStorage.setItem('theme', this.theme);
+    },
+    pushLogToManicTime(log){
+      const _self = this; 
+      if(!log)
+        return;
+      const projectID = log && log.projectID != null ? log.projectID : "No Project";
+      const issueID = log && log.projectID != log.issue && log.issue != '' ? (', ' + log.issue) : '';
+      const description = log.description;
+      const start = _self.toJiraDateTime(log.start);
+      const duration = log.duration;
+      const headers = { 
+          'Authorization': 'Bearer ' + _self.manicTimeToken, 
+          'Content-Type': 'application/json'
+      };
+      const data ={
+        values: {
+          name: "Toggl, " + projectID + issueID,
+          notes: description,
+          timeInterval: {
+              start:  start,
+              duration: duration
+          }
+        }
+      };
+      const timelines = _self.manicTimeTimeline.split(',');
+      console.log(_self.manicTimeTimeline);
+      timelines.forEach(function(timeline){
+        const url = _self.manicTimeServer +  "/api/timelines/" + timeline.trim() + "/activities";
+        console.log(url);
+        axios.post(url, data, {headers: headers})
+        .then(function (response) {
+          console.log(response);
+        })
+        .catch(function (error) {
+          console.log(error);
+        });
+      });
     }
   }
 };

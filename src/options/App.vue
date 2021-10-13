@@ -15,7 +15,7 @@
         <div class="md-layout-item md-size-100">
           <h3>Credentials</h3>
           <md-field>
-            <label>Jira Server url (https://jira.atlassian.net)</label>
+            <label>Jira Server Url (https://jira.atlassian.net)</label>
             <md-input v-model="jiraUrl" />
           </md-field>
           <md-field>
@@ -38,12 +38,31 @@
           <h3>Extra Options</h3>
           <md-checkbox v-model="saveDates">Save dates (Persistent start and end dates)</md-checkbox><br>
           <md-checkbox v-model="weekdayMonday">Start week on monday</md-checkbox><br>
-          <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox>
-          <md-field>
-            <label>URL Jira Plugin</label>
-            <md-input v-model="jiraPlugin" />
-          </md-field>
+          <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox><br>
+          <div v-if="clockworkEnabled">
+            <md-field>
+              <label>URL Jira Plugin</label>
+              <md-input v-model="jiraPlugin" />
+            </md-field>
+          </div>
 
+          <md-checkbox v-model="manicTimeEnabled">Enable upload logs to ManicTime Server as Tags</md-checkbox>
+          <div v-if="manicTimeEnabled">
+            <h3>ManicTime Options</h3>
+            <md-field>
+              <label>ManicTime Server Url</label>
+              <md-input v-model="manicTimeServer" />
+            </md-field>
+            <md-field>
+              <label>ManicTime Token</label>
+              <md-input v-model="manicTimeToken" />
+            </md-field>
+            <md-field>
+              <label>ManicTime Timeline of Tags (multiple timelines separate by ,)</label>
+              <md-input v-model="manicTimeTimeline" />
+            </md-field>
+          </div>
+          
           <div class="button__container">
             <md-button class="md-raised md-accent button__item" @click="saveSettings">
               <span v-show="!isSaving">Save settings</span>
@@ -79,7 +98,11 @@ export default {
       showSnackbar: false,
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
       weekdayMonday: true,
-      saveDates: false
+      saveDates: false,
+      manicTimeEnabled: false,
+      manicTimeServer: 'http://manictime.mmosquera.es',
+      manicTimeToken: '',
+      manicTimeTimeline: ''
     };
   },
   created () {
@@ -98,7 +121,11 @@ export default {
       togglApiToken: '',
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
       weekdayMonday: true,
-      saveDates: false
+      saveDates: false,
+      manicTimeEnabled: false,
+      manicTimeServer: 'http://manictime.mmosquera.es',
+      manicTimeToken: '',
+      manicTimeTimeline: ''
     }).then((setting) => {
       _self.jiraUrl = setting.jiraUrl;
       _self.jiraEmail = setting.jiraEmail;
@@ -113,6 +140,10 @@ export default {
       _self.jiraPlugin = setting.jiraPlugin;
       _self.weekdayMonday = setting.weekdayMonday;
       _self.saveDates = setting.saveDates;
+      _self.manicTimeEnabled = setting.manicTimeEnabled;
+      _self.manicTimeServer = setting.manicTimeServer;
+      _self.manicTimeToken = setting.manicTimeToken;
+      _self.manicTimeTimeline = setting.manicTimeTimeline;
     });
   },
   methods: {
@@ -133,7 +164,11 @@ export default {
         togglApiToken: _self.togglApiToken,
         jiraPlugin: _self.jiraPlugin,
         weekdayMonday: _self.weekdayMonday,
-        saveDates: _self.saveDates
+        saveDates: _self.saveDates,
+        manicTimeEnabled: _self.manicTimeEnabled,
+        manicTimeServer: _self.manicTimeServer,
+        manicTimeToken: _self.manicTimeToken,
+        manicTimeTimeline: _self.manicTimeTimeline
       }).then(() => {
         _self.isSaving = false;
         _self.showSnackbar = true;
