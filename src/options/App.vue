@@ -61,6 +61,7 @@
               <label>ManicTime Timeline of Tags (multiple timelines separate by ,)</label>
               <md-input v-model="manicTimeTimeline" />
             </md-field>
+            <md-checkbox v-model="manicTimeAllowRepost">Allow mode to only repost logs in ManicTime Server</md-checkbox><br>
           </div>
           
           <div class="button__container">
@@ -102,7 +103,8 @@ export default {
       manicTimeEnabled: false,
       manicTimeServer: 'http://manictime.mmosquera.es',
       manicTimeToken: '',
-      manicTimeTimeline: ''
+      manicTimeTimeline: '',
+      manicTimeAllowRepost: false
     };
   },
   created () {
@@ -125,7 +127,8 @@ export default {
       manicTimeEnabled: false,
       manicTimeServer: 'http://manictime.mmosquera.es',
       manicTimeToken: '',
-      manicTimeTimeline: ''
+      manicTimeTimeline: '',
+      manicTimeAllowRepost: false
     }).then((setting) => {
       _self.jiraUrl = setting.jiraUrl;
       _self.jiraEmail = setting.jiraEmail;
@@ -144,6 +147,7 @@ export default {
       _self.manicTimeServer = setting.manicTimeServer;
       _self.manicTimeToken = setting.manicTimeToken;
       _self.manicTimeTimeline = setting.manicTimeTimeline;
+      _self.manicTimeAllowRepost = setting.manicTimeAllowRepost;
     });
   },
   methods: {
@@ -168,7 +172,8 @@ export default {
         manicTimeEnabled: _self.manicTimeEnabled,
         manicTimeServer: _self.manicTimeServer,
         manicTimeToken: _self.manicTimeToken,
-        manicTimeTimeline: _self.manicTimeTimeline
+        manicTimeTimeline: _self.manicTimeTimeline,
+        manicTimeAllowRepost: _self.manicTimeAllowRepost
       }).then(() => {
         _self.isSaving = false;
         _self.showSnackbar = true;

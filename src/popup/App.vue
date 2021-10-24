@@ -67,7 +67,8 @@
 
             <md-table-row v-for="log in logs" :key="log.id">
               <md-table-cell class="no-wrap">
-                <md-checkbox v-if=" log.issue === 'NO ID' || log.isSynced || log.duration < 60" v-model="checkedLogs" disabled :value="log" />
+                <md-checkbox v-if="!allowRepostManicTime && (log.issue === 'NO ID' || log.isSynced || log.duration < 60)" 
+                  v-model="checkedLogs" disabled :value="log" />
                 <md-checkbox v-else v-model="checkedLogs" :value="log" />
               </md-table-cell>
               <md-table-cell class="no-wrap">
@@ -84,6 +85,7 @@
               </md-table-cell>
               <md-table-cell class="no-wrap">
                 <md-icon v-show="log.isSynced" class="md-accent">check_circle</md-icon>
+                <md-icon v-show="log.isSyncedManicTime" class="md-accent manicTimeIconChecked">check_circle</md-icon>
               </md-table-cell>
             </md-table-row>
 
@@ -116,6 +118,9 @@
         <md-button v-else disabled class="md-raised md-accent" @click="syncToJira">
           <span>Log work</span>
         </md-button>
+      </div>
+      <div v-show="manicTimeEnabled && manicTimeAllowRepost" class="button-repost-float">
+        <u @click="alternateRepostManicime">{{ allowRepostManicTime ? 'Hide ' : 'Only ' }} repost ManicTime</u>
       </div>
       <md-snackbar v-if="!errorMessage" :md-active.sync="showSnackbar" md-persistent>
         <span>Yay! Your entries has been logged to Jira✌️</span>
@@ -163,6 +168,7 @@ export default {
       manicTimeServer: '',
       manicTimeToken: '',
       manicTimeTimeline: '',
+      allowRepostManicTime: false,
     };
   },
   watch: {
@@ -201,6 +207,7 @@ export default {
         manicTimeServer: '',
         manicTimeToken: '',
         manicTimeTimeline: '',
+        manicTimeAllowRepost: false,
       })
       .then((setting) => {
         _self.jiraUrl = setting.jiraUrl;
@@ -225,6 +232,7 @@ export default {
         _self.manicTimeServer = setting.manicTimeServer;
         _self.manicTimeToken = setting.manicTimeToken;
         _self.manicTimeTimeline = setting.manicTimeTimeline;
+        _self.manicTimeAllowRepost = setting.manicTimeAllowRepost;
       });
   },mounted() {
     let localTheme = localStorage.getItem('theme'); //gets stored theme value if any
@@ -259,37 +267,40 @@ export default {
         'X-Atlassian-Token': 'no-check', 'User-Agent': ''
       };
       for (let log of this.checkedLogs) {
-        const promise = axios({
-          method: 'post',
-          url:
-            _self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog',
-          data: {
-            timeSpentSeconds: log.duration,
-            comment: _self.processJiraDescription(
-              _self.worklogWihtoutDescription
-                ? log.description.replace(log.issue, '')
-                : log.description
-            ),
-            started: _self.toJiraDateTime(log.start)
-          },
-          headers: headers
-        })
-          .then(function (response) {
-            _self.isSaving = false;
-            _self.showSnackbar = true;
-            _self.checkIfAlreadyLogged(log);
-            _self.checkedLogs = [];
-            _self.syncAllLogs = false;
+        if(!_self.manicTimeEnabled || !_self.allowRepostManicTime){
+          const promise = axios({
+            method: 'post',
+            url:
+              _self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog',
+            data: {
+              timeSpentSeconds: log.duration,
+              comment: _self.processJiraDescription(
+                _self.worklogWihtoutDescription
+                  ? log.description.replace(log.issue, '')
+                  : log.description
+              ),
+              started: _self.toJiraDateTime(log.start)
+            },
+            headers: headers
           })
-          .catch(function (error) {
-            _self.errorMessage = error;
-          });
-          
-        if(_self.manicTimeEnabled)
-            _self.pushLogToManicTime(log);
-        if (!_self.jiraMerge) {
-          await promise;
+            .then(function (response) {
+              _self.isSaving = false;
+              _self.showSnackbar = true;
+              _self.checkIfAlreadyLogged(log);
+              _self.checkedLogs = [];
+              _self.syncAllLogs = false;
+            })
+            .catch(function (error) {
+              _self.errorMessage = error;
+            });
+
+            if (!_self.jiraMerge) {
+              await promise;
+            }
         }
+
+        if(_self.manicTimeEnabled)
+            _self.pushLogsToManicTime(log);
       }
     },
     toJiraDateTime (date) {
@@ -479,6 +490,7 @@ export default {
               .then(function (issueName) {
                 let logObject = log;
                 logObject.isSynced = false;
+                logObject.isSyncedManicTime = false;
                 logObject.issue = issueName;
                 logObject.checked = '';
 
@@ -501,6 +513,7 @@ export default {
                 // There is no ID for the entry but we still need to print it out to the user
                 let logObject = log;
                 logObject.isSynced = false;
+                logObject.isSyncedManicTime = false;
                 logObject.issue = 'NO ID';
                 logObject.checked = '';
                 _self.logs.push(logObject);
@@ -598,19 +611,15 @@ export default {
       document.documentElement.setAttribute('data-theme', this.theme);
       localStorage.setItem('theme', this.theme);
     },
-    pushLogToManicTime(log){
+    async pushLogsToManicTime(log){
       const _self = this; 
-      if(!log)
+      if(!log || log.isSyncedManicTime)
         return;
       const projectID = log && log.projectID != null ? log.projectID : "No Project";
       const issueID = log && log.projectID != log.issue && log.issue != '' ? (', ' + log.issue) : '';
       const description = log.description;
       const start = _self.toJiraDateTime(log.start);
       const duration = log.duration;
-      const headers = { 
-          'Authorization': 'Bearer ' + _self.manicTimeToken, 
-          'Content-Type': 'application/json'
-      };
       const data ={
         values: {
           name: "Toggl, " + projectID + issueID,
@@ -622,18 +631,33 @@ export default {
         }
       };
       const timelines = _self.manicTimeTimeline.split(',');
-      console.log(_self.manicTimeTimeline);
       timelines.forEach(function(timeline){
-        const url = _self.manicTimeServer +  "/api/timelines/" + timeline.trim() + "/activities";
-        console.log(url);
-        axios.post(url, data, {headers: headers})
-        .then(function (response) {
-          console.log(response);
-        })
-        .catch(function (error) {
-          console.log(error);
-        });
+        _self.pushLogToManicTime(log, timeline, data);
       });
+    },
+    async pushLogToManicTime(log, timeline, data, retry = false){
+      const _self = this;
+      const url = _self.manicTimeServer +  "/api/timelines/" + timeline.trim() + "/activities";
+      const headers = { 
+        'Authorization': 'Bearer ' + _self.manicTimeToken, 
+        'Content-Type': 'application/json'
+      };
+      const promise = axios.post(url, data, {headers: headers})
+      .then(function (response) {
+        log.isSyncedManicTime = true;
+      })
+      .catch(function (error) {
+        log.isSyncedManicTime = false;
+        console.log(error);
+        if(retry){
+          _self.pushLogToManicTimeUnique(log, false);
+        }
+      });
+
+      return promise;
+    },
+    alternateRepostManicime(log, data, retry = true){
+      this.allowRepostManicTime = !this.allowRepostManicTime;
     }
   }
 };
@@ -789,6 +813,23 @@ img {
 .tooltip:hover .tooltiptext {
   visibility: visible;
   opacity: 1;
+}
+
+.button-repost-float{
+  float: left;
+  display: inline;
+  overflow: hidden;
+  left: 0px;
+  bottom: 0px;
+  position: relative;
+  font-size: 12px;
+}
+
+.manicTimeIconChecked {
+  color: yellow !important;
+  min-width: 5px;
+  width: 15px;
+  font-size: 14px !important;
 }
 
 /* Theme Part */
