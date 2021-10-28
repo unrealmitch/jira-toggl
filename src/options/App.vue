@@ -101,7 +101,7 @@ export default {
       weekdayMonday: true,
       saveDates: false,
       manicTimeEnabled: false,
-      manicTimeServer: 'http://manictime.mmosquera.es',
+      manicTimeServer: '',
       manicTimeToken: '',
       manicTimeTimeline: '',
       manicTimeAllowRepost: false
@@ -125,7 +125,7 @@ export default {
       weekdayMonday: true,
       saveDates: false,
       manicTimeEnabled: false,
-      manicTimeServer: 'http://manictime.mmosquera.es',
+      manicTimeServer: '',
       manicTimeToken: '',
       manicTimeTimeline: '',
       manicTimeAllowRepost: false

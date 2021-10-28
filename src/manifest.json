@@ -3,6 +3,7 @@
   "description": "Web extension that sync Toggl Time records to Jira Worklogs",
   "version": null,
   "permissions": [
+    "https://api.track.toggl.com/*",
     "https://www.toggl.com/*",
     "https://toggl.com/*",
     "https://*.atlassian.net/*",

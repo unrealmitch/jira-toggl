@@ -51,7 +51,7 @@
           <md-icon>navigate_next</md-icon>
         </md-button>
       </div>
-      <div class="md-layout">
+      <div class="md-layout" :class="{ 'disabled-div': isSaving }">
         <div class="md-layout-item">
           <md-table>
             <md-table-row>
@@ -95,13 +95,13 @@
               <md-table-cell class="no-wrap"><b>TOTAL</b></md-table-cell>
               <md-table-cell class="no-wrap">
                 <div class="tooltip">
-                  <i>{{ totalDuration(true) }}</i>
+                  <p><i>{{ totalDuration(true) }}</i></p>
                   <span class="tooltiptext">Time in Jira</span>
                 </div>
               </md-table-cell>
               <md-table-cell class="no-wrap">
                 <div class="tooltip">
-                  <n>{{ totalDuration() }}</n>
+                  <p>{{ totalDuration() }}</p>
                   <span class="tooltiptext">Time in Toggl</span>
                 </div>
               </md-table-cell>
@@ -111,12 +111,12 @@
         </div>
       </div>
       <div class="button__container">
-        <md-button v-if="checkedLogs.length" class="md-raised md-accent" @click="syncToJira">
+        <md-button v-if="checkedLogs.length && !isSaving" class="md-raised md-accent" @click="syncToJira">
           <span v-show="!isSaving">Log work</span>
-          <span v-show="isSaving">Logging...</span>
         </md-button>
         <md-button v-else disabled class="md-raised md-accent" @click="syncToJira">
-          <span>Log work</span>
+          <span v-show="!isSaving">Log work</span>
+          <span v-show="isSaving">Logging...</span>
         </md-button>
       </div>
       <div v-show="manicTimeEnabled && manicTimeAllowRepost" class="button-repost-float">
@@ -264,8 +264,11 @@ export default {
     async syncToJira () {
       const _self = this;
       const headers = {
-        'X-Atlassian-Token': 'no-check', 'User-Agent': ''
+        'X-Atlassian-Token': 'no-check'
       };
+
+      _self.blockFetch = true;
+      _self.isSaving = true;
       const awaitingIssues = {};
       for (let log of this.checkedLogs) {
         if(!_self.manicTimeEnabled || !_self.allowRepostManicTime){
@@ -288,8 +291,8 @@ export default {
             headers: headers
           })
             .then(function (response) {
-              _self.isSaving = false;
-              _self.showSnackbar = true;
+              // _self.isSaving = false;
+              // _self.showSnackbar = true;
               _self.checkIfAlreadyLogged(log);
               _self.checkedLogs = [];
               _self.syncAllLogs = false;
@@ -308,8 +311,12 @@ export default {
         }
 
         if(_self.manicTimeEnabled)
-            _self.pushLogsToManicTime(log);
+            await _self.pushLogsToManicTime(log);
       }
+
+      _self.blockFetch = false;
+      _self.isSaving = false;
+      _self.showSnackbar = true;
     },
     toJiraDateTime (date) {
       let parsedDate = Date.parse(date);
@@ -406,9 +413,10 @@ export default {
         }
         if (typeof log.pid !== 'undefined') {
           axios
-            .get('https://www.toggl.com/api/v8/projects/' + log.pid, {
+            .get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
               headers: {
-                Authorization:
+                'Content-Type': 'application/json',
+                'Authorization':
                   'Basic ' + btoa(_self.togglApiToken + ':api_token')
               }
             })
@@ -439,7 +447,7 @@ export default {
     getProjectID(log){
       if (typeof log.pid !== 'undefined') {
         axios
-          .get('https://www.toggl.com/api/v8/projects/' + log.pid, {
+          .get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
             headers: {
               Authorization:
                 'Basic ' + btoa(_self.togglApiToken + ':api_token')
@@ -457,7 +465,7 @@ export default {
         reject(log);
       }
     },
-    fetchEntries () {
+    async fetchEntries () {
       let _self = this;
       const offset = new Date().getTimezoneOffset();
       const sign = offset <= 0 ? '+' : '-';
@@ -479,8 +487,8 @@ export default {
       }
 
       _self.blockFetch = true;
-      axios
-        .get('https://www.toggl.com/api/v8/time_entries', {
+      await axios
+        .get('https://api.track.toggl.com/api/v8/time_entries', {
           headers: {
             Authorization: 'Basic ' + btoa(_self.togglApiToken + ':api_token')
           },
@@ -489,11 +497,13 @@ export default {
             end_date: endDate
           }
         })
-        .then(function (entries) {
-          _self.blockFetch = false;
+        .then(async function (entries) {
           entries.data.reverse();
-          entries.data.forEach(function (log) {
-            _self
+
+          // await entries.data.forEach(async function (log) {
+          for (let i = 0; i < entries.data.length; i++) {
+            let log = entries.data[i];
+            await _self
               .getIssue(log)
               .then(function (issueName) {
                 let logObject = log;
@@ -526,7 +536,9 @@ export default {
                 logObject.checked = '';
                 _self.logs.push(logObject);
               });
-          });
+              await new Promise(resolve => setTimeout(resolve, 50));  //Delay to avoid to many requests (error 429)
+          } // });
+          _self.blockFetch = false;
         })
         .catch(function (error) {
           _self.blockFetch = false;
@@ -639,9 +651,10 @@ export default {
         }
       };
       const timelines = _self.manicTimeTimeline.split(',');
-      timelines.forEach(function(timeline){
-        _self.pushLogToManicTime(log, timeline, data);
-      });
+
+      for(let i = 0; i < timelines.length; i++){
+        await _self.pushLogToManicTime(log, timelines[i], data);
+      }
     },
     async pushLogToManicTime(log, timeline, data, retry = false){
       const _self = this;
@@ -891,6 +904,11 @@ svg{
 }
 .container {
   background-color: var(--md-theme-default-background, white);
+}
+
+.disabled-div {
+    pointer-events: none;
+    opacity: 0.7;
 }
 
 .md-toolbar.md-theme-default{

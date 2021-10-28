@@ -1,6 +1,6 @@
 {
   "name": "toggl2jira",
-  "version": "1.6.5",
+  "version": "1.6.6",
   "description": "Web extension that sync Toggl Time records to Jira Worklogs",
   "author": "UnrealMitch <unrealmitch@gmail.com>",
   "scripts": {
