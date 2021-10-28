@@ -266,8 +266,12 @@ export default {
       const headers = {
         'X-Atlassian-Token': 'no-check', 'User-Agent': ''
       };
+      const awaitingIssues = {};
       for (let log of this.checkedLogs) {
         if(!_self.manicTimeEnabled || !_self.allowRepostManicTime){
+          if (log.issue in awaitingIssues) {
+            await awaitingIssues[log.issue];
+          }
           const promise = axios({
             method: 'post',
             url:
@@ -292,11 +296,15 @@ export default {
             })
             .catch(function (error) {
               _self.errorMessage = error;
+            })
+            .finally(function () {
+              delete awaitingIssues[log.issue];
             });
+          awaitingIssues[log.issue] = promise;
 
-            if (!_self.jiraMerge) {
-              await promise;
-            }
+          if (!_self.jiraMerge) {
+            await promise;
+          }
         }
 
         if(_self.manicTimeEnabled)
@@ -496,7 +504,7 @@ export default {
 
                 if (_self.jiraMerge) {
                   let logIndex = _self.logs.findIndex(
-                    (i) => i.description === log.description
+                    (i) => i.description === log.description && i.issue === issueName
                   );
                   if (logIndex !== -1) {
                     _self.logs[logIndex].duration =
@@ -774,7 +782,7 @@ img {
   z-index: 10;
 }
 
-/* ToolTip*/
+/* ToolTip */
 
 .tooltip {
   position: relative;
