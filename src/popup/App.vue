@@ -361,16 +361,7 @@ export default {
       return hDisplay + ' ' + mDisplay;
     },
     isSameStart (worklog, log) {
-      const _self = this;
-      if (_self.jiraMerge) {
-        const format = 'DD/MM/YYYY';
-        return (
-          _self.$moment(worklog.started).format(format) ===
-          _self.$moment(log.start).format(format)
-        );
-      } else {
-        return worklog.started === _self.toJiraDateTime(log.start);
-      }
+      return new Date(worklog.started).getTime() === new Date(log.start).getTime();
     },
     checkIfAlreadyLogged (log) {
       const _self = this;
@@ -387,6 +378,7 @@ export default {
               let logIndex = _self.logs.findIndex((i) => i.id === log.id);
               if (typeof _self.logs[logIndex] !== 'undefined') {
                 _self.logs[logIndex].isSynced = true;
+                return;
               }
             }
           });
