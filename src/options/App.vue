@@ -38,6 +38,9 @@
           <h3>Extra Options</h3>
           <md-checkbox v-model="saveDates">Save dates (Persistent start and end dates)</md-checkbox><br>
           <md-checkbox v-model="weekdayMonday">Start week on monday</md-checkbox><br>
+          <md-checkbox v-model="useTogglColors">Use Toggl project colors in issue link</md-checkbox><br>
+          <md-checkbox v-model="showJiraIssueInfo">Show Jira Info over Issue link</md-checkbox><br>
+          <md-checkbox v-model="reverseLogs">Show newest logs at top (logs date in descending order)</md-checkbox><br>
           <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox><br>
           <div v-if="clockworkEnabled">
             <md-field>
@@ -100,6 +103,9 @@ export default {
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
       weekdayMonday: true,
       saveDates: false,
+      useTogglColors: true,
+      showJiraIssueInfo: false,
+      reverseLogs: true,
       manicTimeEnabled: false,
       manicTimeServer: '',
       manicTimeToken: '',
@@ -124,6 +130,9 @@ export default {
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
       weekdayMonday: true,
       saveDates: false,
+      useTogglColors: true,
+      showJiraIssueInfo: false,
+      reverseLogs: true,
       manicTimeEnabled: false,
       manicTimeServer: '',
       manicTimeToken: '',
@@ -143,6 +152,9 @@ export default {
       _self.jiraPlugin = setting.jiraPlugin;
       _self.weekdayMonday = setting.weekdayMonday;
       _self.saveDates = setting.saveDates;
+      _self.useTogglColors = setting.useTogglColors;
+      _self.showJiraIssueInfo = setting.showJiraIssueInfo;
+      _self.reverseLogs = setting.reverseLogs;
       _self.manicTimeEnabled = setting.manicTimeEnabled;
       _self.manicTimeServer = setting.manicTimeServer;
       _self.manicTimeToken = setting.manicTimeToken;
@@ -169,6 +181,9 @@ export default {
         jiraPlugin: _self.jiraPlugin,
         weekdayMonday: _self.weekdayMonday,
         saveDates: _self.saveDates,
+        useTogglColors: _self.useTogglColors,
+        showJiraIssueInfo: _self.showJiraIssueInfo,
+        reverseLogs: _self.reverseLogs,
         manicTimeEnabled: _self.manicTimeEnabled,
         manicTimeServer: _self.manicTimeServer,
         manicTimeToken: _self.manicTimeToken,

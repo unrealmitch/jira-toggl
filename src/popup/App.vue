@@ -72,9 +72,21 @@
                 <md-checkbox v-else v-model="checkedLogs" :value="log" />
               </md-table-cell>
               <md-table-cell class="no-wrap">
-                <a v-if="log.issue != 'NO ID'" :href="jiraUrl + '/browse/' + log.issue" target="_blank">{{ log.issue }}</a><a v-else>{{ log.issue }}</a>
+                <div class="tooltip">
+                  <a v-if="log.issue != 'NO ID'" :href="jiraUrl + '/browse/' + log.issue" target="_blank" :style="{color:getLogColor(log)}">
+                  {{ log.issue }}</a>
+                  <a v-else>{{ log.issue }}</a>
+                  <span v-if="showJiraIssueInfo" class="tooltiptextright tooltiptext">
+                    <p><span v-html="getIssueInfo(log)"></span></p>
+                  </span>
+                </div>
               </md-table-cell>
-              <md-table-cell>{{ log.description }}</md-table-cell>
+              <md-table-cell>
+                <div class="tooltip">
+                  <p><span v-html="getLogDescriptionPanel(log)"></span></p>
+                  <span class="tooltiptext tooltiptext-top tooltiptextmax">{{getProjectInfo(log)}}</span>
+                </div>
+              </md-table-cell>
               <md-table-cell class="no-wrap">
                 {{
                   $moment(log.start).format("l")
@@ -96,13 +108,13 @@
               <md-table-cell class="no-wrap">
                 <div class="tooltip">
                   <p><i>{{ totalDuration(true) }}</i></p>
-                  <span class="tooltiptext">Time in Jira</span>
+                  <span class="tooltiptext-top tooltiptext">Time in Jira</span>
                 </div>
               </md-table-cell>
               <md-table-cell class="no-wrap">
                 <div class="tooltip">
                   <p>{{ totalDuration() }}</p>
-                  <span class="tooltiptext">Time in Toggl</span>
+                  <span class="tooltiptext-top tooltiptext">Time in Toggl</span>
                 </div>
               </md-table-cell>
               <md-table-cell class="no-wrap" />
@@ -147,6 +159,9 @@ export default {
       startDate: initalStartDate,
       endDate: initalEndDate,
       logs: [],
+      projectsToggl: [],
+      worklogsJira: [],
+      issuesJira: [],
       errorMessage: null,
       jiraUrl: '',
       jiraEmail: '',
@@ -163,6 +178,9 @@ export default {
       blockFetch: false,
       weekdayMonday: true,
       saveDates: false,
+      useTogglColors: true,
+      showJiraIssueInfo: false,
+      reverseLogs: true,
       theme: '',
       manicTimeEnabled: false,
       manicTimeServer: '',
@@ -171,6 +189,7 @@ export default {
       allowRepostManicTime: false,
     };
   },
+
   watch: {
     startDate: function (newVal, oldVal) {
       if (newVal.toString() !== oldVal.toString()) {
@@ -183,6 +202,7 @@ export default {
       }
     }
   },
+
   created () {
     const _self = this;
 
@@ -203,6 +223,9 @@ export default {
         startDate: initalStartDate,
         endDate: initalEndDate,
         saveDates: false,
+        useTogglColors: true,
+        showJiraIssueInfo: false,
+        reverseLogs: true,
         manicTimeEnabled: false,
         manicTimeServer: '',
         manicTimeToken: '',
@@ -223,6 +246,9 @@ export default {
         _self.jiraPlugin = setting.jiraPlugin;
         _self.weekdayMonday = setting.weekdayMonday;
         _self.saveDates = setting.saveDates;
+        _self.useTogglColors = setting.useTogglColors;
+        _self.showJiraIssueInfo = setting.showJiraIssueInfo;
+        _self.reverseLogs = setting.reverseLogs;
         if (_self.saveDates) {
           _self.startDate = setting.startDate;
           _self.endDate = setting.endDate;
@@ -234,11 +260,14 @@ export default {
         _self.manicTimeTimeline = setting.manicTimeTimeline;
         _self.manicTimeAllowRepost = setting.manicTimeAllowRepost;
       });
-  },mounted() {
+  },
+  
+  mounted() {
     let localTheme = localStorage.getItem('theme'); //gets stored theme value if any
     document.documentElement.setAttribute('data-theme', localTheme); // updates the data-theme attribute
     this.theme = localTheme;
   },
+
   methods: {
     refreshEntries () {
       if (this.saveDates) {
@@ -246,8 +275,12 @@ export default {
       }
       this.checkedLogs = [];
       this.logs = [];
+      this.projectsToggl = [];
+      this.worklogsJira = [];
+      this.issuesJira = [];
       this.fetchEntries();
     },
+
     processJiraDescription (description) {
       const _self = this;
       if (_self.worklogDescriptionSplit && _self.stringSplit) {
@@ -261,6 +294,7 @@ export default {
 
       return description;
     },
+
     async syncToJira () {
       const _self = this;
       const headers = {
@@ -294,8 +328,8 @@ export default {
               // _self.isSaving = false;
               // _self.showSnackbar = true;
               _self.checkIfAlreadyLogged(log);
-              _self.checkedLogs = [];
-              _self.syncAllLogs = false;
+              // _self.checkedLogs = [];
+              // _self.syncAllLogs = false;
             })
             .catch(function (error) {
               _self.errorMessage = error;
@@ -318,6 +352,7 @@ export default {
       _self.isSaving = false;
       _self.showSnackbar = true;
     },
+
     toJiraDateTime (date) {
       let parsedDate = Date.parse(date);
       let jiraDate = Date.now();
@@ -331,6 +366,7 @@ export default {
       dateString = dateString.replace('Z', timeZoneString);
       return dateString;
     },
+
     doSyncAllLogs () {
       let _self = this;
       if (this.syncAllLogs) {
@@ -343,6 +379,7 @@ export default {
         this.checkedLogs = [];
       }
     },
+
     formatDuration (duration) {
       duration = Number(duration);
 
@@ -360,30 +397,48 @@ export default {
       let mDisplay = m > 0 ? m + 'm' : '';
       return hDisplay + ' ' + mDisplay;
     },
+
     isSameStart (worklog, log) {
       return new Date(worklog.started).getTime() === new Date(log.start).getTime();
     },
-    checkIfAlreadyLogged (log) {
+
+    async checkIfAlreadyLogged (log) {
       const _self = this;
-      axios
+      _self.worklogsJira.forEach(function (worklogJira) {
+        if (log.issue === worklogJira.issueID) {
+          worklogJira.worklogs.forEach(function (worklog) {
+            _self.findLogInWorklogs(log, worklog);
+          });
+          return;
+        }
+      });
+
+      await axios
         .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog')
         .then(function (response) {
           let worklogs = response.data.worklogs;
+          response.data.issueID = log.issue;
+          _self.worklogsJira.push(response.data);
           worklogs.forEach(function (worklog) {
-            if (
-              _self.isSameStart(worklog, log) &&
-              worklog.author.emailAddress?.toLowerCase() ===
-                _self.jiraEmail?.toLowerCase()
-            ) {
-              let logIndex = _self.logs.findIndex((i) => i.id === log.id);
-              if (typeof _self.logs[logIndex] !== 'undefined') {
-                _self.logs[logIndex].isSynced = true;
-                return;
-              }
-            }
+            _self.findLogInWorklogs(log, worklog);
           });
         });
     },
+
+    findLogInWorklogs(log, worklog){
+      const _self = this;
+      if (
+        _self.isSameStart(worklog, log) &&
+        worklog.author.emailAddress?.toLowerCase() === _self.jiraEmail?.toLowerCase()
+      ){
+        let logIndex = _self.logs.findIndex((i) => i.id === log.id);
+        if (typeof _self.logs[logIndex] !== 'undefined') {
+          _self.logs[logIndex].isSynced = true;
+          return;
+        }
+      }
+    },
+
     matchIssueId (name) {
       if (this.allowNumbersInId) {
         return name.match(/^[A-Z][A-Z,0-9]*-[0-9]*/);
@@ -391,6 +446,7 @@ export default {
         return name.match(/^[A-Z]*-[0-9]*/);
       }
     },
+
     getIssue (log) {
       let _self = this;
       return new Promise(function (resolve, reject) {
@@ -404,29 +460,45 @@ export default {
           log.description = ''; // Set empty string (not null), to avoid reference null problems
         }
         if (typeof log.pid !== 'undefined') {
-          axios
-            .get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization':
-                  'Basic ' + btoa(_self.togglApiToken + ':api_token')
-              }
-            })
-            .then(function (issue) {
+          _self.projectsToggl.forEach(function (projectToggl) {
+            if (log.pid === projectToggl.id) {
               const parsedIssue = _self.matchIssueId(issue.data.data.name);
               if (parsedIssue) {
                 log.projectID = parsedIssue[0];
+                log.projectData = projectToggl;
                 resolve(parsedIssue[0]);
               } else {
                 log.projectID = null;
                 reject(log);
               }
-            });
+              return;
+            }
+          });
+
+          axios.get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization':
+                'Basic ' + btoa(_self.togglApiToken + ':api_token')
+            }
+          }).then(function (issue) {
+              _self.projectsToggl.push(issue.data.data);
+              const parsedIssue = _self.matchIssueId(issue.data.data.name);
+              if (parsedIssue) {
+                log.projectID = parsedIssue[0];
+                log.projectData = issue.data.data;
+                resolve(parsedIssue[0]);
+              } else {
+                log.projectID = null;
+                reject(log);
+              }
+          });
         } else {
           reject(log);
         }
       });
     },
+
     getDescriptionID(log){
       if(log.description != null && log.description != ''){
         const parsedIssue = _self.matchIssueId(log.description);
@@ -436,6 +508,7 @@ export default {
       }
       return null;
     },
+
     getProjectID(log){
       if (typeof log.pid !== 'undefined') {
         axios
@@ -457,6 +530,7 @@ export default {
         reject(log);
       }
     },
+
     async fetchEntries () {
       let _self = this;
       const offset = new Date().getTimezoneOffset();
@@ -490,14 +564,15 @@ export default {
           }
         })
         .then(async function (entries) {
-          entries.data.reverse();
+          if(_self.reverseLogs)
+            entries.data.reverse();
 
           // await entries.data.forEach(async function (log) {
           for (let i = 0; i < entries.data.length; i++) {
             let log = entries.data[i];
             await _self
               .getIssue(log)
-              .then(function (issueName) {
+              .then(async function (issueName) {
                 let logObject = log;
                 logObject.isSynced = false;
                 logObject.isSyncedManicTime = false;
@@ -517,7 +592,11 @@ export default {
                 } else {
                   _self.logs.push(logObject);
                 }
+
                 _self.checkIfAlreadyLogged(log);
+
+                if(_self.showJiraIssueInfo)
+                  await _self.getIssueFromJira(log);
               })
               .catch(function (log) {
                 // There is no ID for the entry but we still need to print it out to the user
@@ -528,6 +607,7 @@ export default {
                 logObject.checked = '';
                 _self.logs.push(logObject);
               });
+
               await new Promise(resolve => setTimeout(resolve, 50));  //Delay to avoid to many requests (error 429)
           } // });
           _self.blockFetch = false;
@@ -547,6 +627,7 @@ export default {
           }
         });
     },
+
     totalDuration (synced = false) {
       let _self = this;
       if (!_self.logs.length) {
@@ -565,18 +646,21 @@ export default {
         return _self.formatDuration(totalDuration);
       }
     },
+
     dayMinus () {
       if (this.blockFetch) {
         return;
       }
       this.moveDays(-1);
     },
+
     dayPlus () {
       if (this.blockFetch) {
         return;
       }
       this.moveDays(1);
     },
+
     moveDays (ndays) {
       let newStartDate = moment(this.startDate).add(ndays, 'days');
       let newEndDate = moment(this.endDate).add(ndays, 'days');
@@ -584,11 +668,13 @@ export default {
       this.endDate = new Date(newEndDate.startOf('day'));
       this.refreshEntries();
     },
+
     moveToday () {
       this.startDate = new Date(moment().startOf('day'));
       this.endDate = this.startDate;
       this.refreshEntries();
     },
+
     clockworkUrl () {
       let startDate = moment(this.startDate)
         .utc(true)
@@ -602,12 +688,14 @@ export default {
         this.jiraPlugin.replace('{jiraUrl}', this.jiraUrl).replace('{startDate}', startDate).replace('{endDate}', endDate)
       );
     },
+
     formatDateToPicker (date) {
       const y = new Date(date).getFullYear();
       const m = new Date(date).getMonth() + 1;
       const d = new Date(date).getDate();
       return y.toString() + '-' + m.toString() + '-' + d.toString();
     },
+
     saveActualDates () {
       const _self = this;
       _self.isSaving = true;
@@ -618,11 +706,108 @@ export default {
         _self.isSaving = false;
       });
     },
+
+    getLogDescriptionPanel(log){
+      if(log.description && log.description.length > 0){
+        return "<p>" + log.description + "</p>";
+      }else if(log.projectData != null && log.projectData.name && log.projectData.name.length > 0){
+        return '<i><p style="opacity:60%;">' + log.projectData.name + "</p></i>";
+      }else{
+        return '<i><p style="opacity:50%;"><i>No Description</p></i>';
+      }
+    },
+
+    getLogColor(log){
+      if(this.useTogglColors && log.projectData && log.projectData.hex_color){
+        return log.projectData.hex_color;
+      }else{
+        return "";
+      }
+    },
+
+    getProjectInfo(log){
+      if(log.projectData != null && log.projectData.name && log.projectData.name.length > 0){
+        if(log.projectData.actual_hours)
+          return log.projectData.name + " [" + log.projectData.actual_hours + "h]";
+        else
+          return log.projectData.name;
+      }else{
+        return "No Project Info";
+      }
+    },
+
+    getIssuesJira(){
+      let _self = this;
+      if(_self.showJiraIssueInfo)
+        _self.logs.forEach(function (log) {
+          if (log.issue && log.issue !== '') {
+            _self.getIssueFromJira(log);
+          }
+        });
+    },
+
+    async getIssueFromJira(log){
+      const _self = this;
+      let id = log.issue;
+      if( (id == null || id == '') && log.projectID != null && log.projectID != '')
+        id = log.projectID;
+
+      if( id == null || id == '' || id == "NO ID" )
+        return;
+
+      _self.issuesJira.forEach(function (issueJira) {
+        if (id === issueJira.key) {
+          log.issueJira = issueJira;
+          return;
+        }
+      });
+
+      await axios
+        .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue)
+        .then(function (response) {
+          let issueJira = response.data;
+          _self.worklogsJira.push(issueJira);
+          log.issueJira = issueJira;
+          let logIndex = _self.logs.findIndex((i) => i.id === log.id);
+          if (typeof _self.logs[logIndex] !== 'undefined') {
+            _self.logs[logIndex].issueJira = issueJira;
+          }
+        });
+    },
+
+    getIssueInfo(log){
+      if(log.issueJira){
+        let output = "<i>" + log.issueJira.fields.summary + "</i><br>";
+        try{
+          output += log.issueJira.fields.issuetype.name + " - ";
+          output += "<b>" + log.issueJira.fields.status.name + "</b> - ";
+          output += log.issueJira.fields.priority.name + "<br>";
+          output += (log.issueJira.fields.timespent/3600).toFixed(2) + "h";
+          if(log.issueJira.fields.timeestimate && log.issueJira.fields.timeestimate > 0)
+            output += " / " + (log.issueJira.fields.timeestimate/3600).toFixed(2) + "h";
+          output += " (" +  log.issueJira.fields.progress.percent + "%)<br>";
+          if(log.issueJira.fields.assignee){
+            output += log.issueJira.fields.assignee.displayName;
+          }else{
+            output += "Unassigned";
+          }
+            
+        }catch{
+
+        }
+
+        return output;
+      }else{
+        return "No Issue Info";
+      }
+    },
+
     toggleTheme() {
       this.theme = this.theme == 'darkMode' ? '' : 'darkMode';
       document.documentElement.setAttribute('data-theme', this.theme);
       localStorage.setItem('theme', this.theme);
     },
+
     async pushLogsToManicTime(log){
       const _self = this; 
       if(!log || log.isSyncedManicTime)
@@ -648,6 +833,7 @@ export default {
         await _self.pushLogToManicTime(log, timelines[i], data);
       }
     },
+
     async pushLogToManicTime(log, timeline, data, retry = false){
       const _self = this;
       const url = _self.manicTimeServer +  "/api/timelines/" + timeline.trim() + "/activities";
@@ -669,9 +855,11 @@ export default {
 
       return promise;
     },
+
     alternateRepostManicime(log, data, retry = true){
       this.allowRepostManicTime = !this.allowRepostManicTime;
     }
+
   }
 };
 </script>
@@ -737,7 +925,6 @@ export default {
   font-size: 16px;
   position: absolute;
   bottom: 0;
-  
 }
 
 .error-msg{
@@ -805,11 +992,30 @@ img {
   padding: 5px 0;
   position: absolute;
   z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltiptext-top {
   bottom: 125%;
   left: 50%;
   margin-left: -75px;
-  opacity: 0;
-  transition: opacity 0.3s;
+}
+
+.tooltip .tooltiptextmax{
+  width: 300px;
+  margin-left: -150px;
+  padding: 2px 0;
+  left: 150px;
+  bottom: 95%;
+}
+
+.tooltip .tooltiptextright {
+  top: -5%;
+  left: 120%;
+  width: 325px;
+  white-space: pre-line;
+  padding: 1px 5px;
 }
 
 .tooltip .tooltiptext::after {
@@ -821,6 +1027,16 @@ img {
   border-width: 5px;
   border-style: solid;
   border-color: #555 transparent transparent transparent;
+}
+
+.tooltiptextright::after {
+  content: "";
+  position: absolute;
+
+  right: 100%;
+  margin-top: -5px;
+  border-width: 5px;
+  border-style: solid;
 }
 
 .tooltip:hover .tooltiptext {
