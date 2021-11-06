@@ -144,6 +144,16 @@
       <md-snackbar v-if="!errorMessage" :md-active.sync="showSnackbar" md-persistent>
         <span class="white" >Yay! Your entries has been logged to Jira ✌️</span>
       </md-snackbar>
+
+      <div id="modaleg" class="modal">
+        <!-- Modal content -->
+        <div class="modal-content" id="modal-content-eg">
+          <div class="modal-body">
+            <img style="width:100%" src="/icons/easteregg.png" alt="Fiscaliza!">
+          </div>
+        </div>
+      </div>
+
     </div>
     <md-toolbar v-if="errorMessage" class="md-accent error-message md-layout md-alignment-center-center">
       <p class="error-msg">{{ errorMessage }}</p>
@@ -351,6 +361,9 @@ export default {
             await promise;
           }
         }
+
+        if(_self.jiraUrl.includes("xoia"))
+          _self.showEasterEgg();
 
         if(_self.manicTimeEnabled)
             await _self.pushLogsToManicTime(log);
@@ -906,6 +919,23 @@ export default {
 
     alternateRepostManicime(log, data, retry = true){
       this.allowRepostManicTime = !this.allowRepostManicTime;
+    },
+
+    async showEasterEgg(){
+      const modal = document.getElementById("modaleg");
+      const modalcontent = document.getElementById("modal-content-eg");
+      modalcontent.classList.remove('modalclose');
+      modalcontent.classList.add('modalopen');
+      modal.classList.remove('modalFadeOut');
+      modal.classList.add('modalfadeIn');
+      modal.style.display = "block";
+      await this.delay(2000);
+      modalcontent.classList.remove('modalopen');
+      modalcontent.classList.add('modalclose');
+      modal.classList.remove('modalfadeIn');
+      modal.classList.add('modalFadeOut');
+      await this.delay(350);
+      modal.style.display = "none";
     }
 
   }
@@ -1130,6 +1160,96 @@ img {
 
 .white {
   color: white;
+}
+
+/* The Modal (background) */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 100; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+}
+
+.modalfadeIn{
+  -webkit-animation-name: fadeIn; /* Fade in the background */
+  -webkit-animation-duration: 0.4s;
+  animation-name: fadeIn;
+  animation-duration: 0.4s
+}
+
+.modalFadeOut{
+  -webkit-animation-name: fadeOut; /* Fade in the background */
+  -webkit-animation-duration: 0.4s;
+  animation-name: fadeOut;
+  animation-duration: 0.4s
+}
+
+/* Modal Content */
+.modal-content {
+  position: fixed;
+  width: 250px;
+  right: 0px;
+  bottom: 0;
+  width: 250px;
+}
+
+.modalopen {
+  -webkit-animation-name: slideIn;
+  -webkit-animation-duration: 0.4s;
+  animation-name: slideIn;
+  animation-duration: 0.4s
+}
+
+.modalclose {
+  -webkit-animation-name: slideOut;
+  -webkit-animation-duration: 0.4s;
+  animation-name: slideOut;
+  animation-duration: 0.4s
+}
+
+/* Add Animation */
+@-webkit-keyframes slideIn {
+  from {bottom: -300px; opacity: 0} 
+  to {bottom: 0; opacity: 1}
+}
+
+@keyframes slideIn {
+  from {bottom: -300px; opacity: 0}
+  to {bottom: 0; opacity: 1}
+}
+
+@-webkit-keyframes fadeIn {
+  from {opacity: 0} 
+  to {opacity: 1}
+}
+
+@keyframes fadeIn {
+  from {opacity: 0} 
+  to {opacity: 1}
+}
+
+@-webkit-keyframes slideOut {
+  from {bottom: 0; opacity: 1} 
+  to {bottom: -300px; opacity: 0}
+}
+
+@keyframes slideOut {
+  from {bottom: 0; opacity: 1}
+  to {bottom: -300px; opacity: 0}
+}
+
+@-webkit-keyframes fadeOut {
+  from {opacity: 0} 
+  to {opacity: 1}
+}
+
+@keyframes fadeOut {
+  from {opacity: 0} 
+  to {opacity: 1}
 }
 
 /* Theme Part */
