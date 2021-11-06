@@ -17,7 +17,7 @@
               <md-icon>autorenew</md-icon>
             </md-button>
             <md-button @click="toggleTheme" class="md-icon-button">
-                <md-icon v-if="this.theme == 'darkMode'">light_mode</md-icon>
+                <md-icon v-if="this.theme == 'lightMode'">light_mode</md-icon>
                 <md-icon v-else>dark_mode</md-icon>     
             </md-button>
             <a href="../options/options.html" target="_blank">
@@ -72,11 +72,12 @@
                 <md-checkbox v-else v-model="checkedLogs" :value="log" />
               </md-table-cell>
               <md-table-cell class="no-wrap">
-                <div class="tooltip">
+                <div class="tooltip tooltipup">
                   <a v-if="log.issue != 'NO ID'" :href="jiraUrl + '/browse/' + log.issue" target="_blank" :style="{color:getLogColor(log)}">
                   {{ log.issue }}</a>
                   <a v-else>{{ log.issue }}</a>
-                  <span v-if="showJiraIssueInfo" class="tooltiptextright tooltiptext">
+                  
+                  <span v-if="showJiraIssueInfo" class="tooltiptextright tooltiptext" >
                     <p><span v-html="getIssueInfo(log)"></span></p>
                   </span>
                 </div>
@@ -88,12 +89,18 @@
                 </div>
               </md-table-cell>
               <md-table-cell class="no-wrap">
-                {{
-                  $moment(log.start).format("l")
-                }}
+                <!-- <span v-b-tooltip.hover.top :title='getStartEnd(log)'>
+                  {{$moment(log.start).format("l")}}
+                </span> -->
+                <div class="tooltip">
+                  {{$moment(log.start).format("l")}}
+                  <span class="tooltiptext tooltiptext tooltiptextdate">
+                    {{getStartEnd(log)}}
+                  </span>
+                </div>
               </md-table-cell>
-              <md-table-cell class="no-wrap" :class="log.duration > 60 ? 'timeBlack' : 'timeRed'">
-                {{ formatDuration(log.duration) }}
+              <md-table-cell class="no-wrap">
+                <p :class="log.duration > 60 ? '' : 'timeRed'">{{formatDuration(log.duration)}}</p>
               </md-table-cell>
               <md-table-cell class="no-wrap">
                 <md-icon v-show="log.isSynced" class="md-accent">check_circle</md-icon>
@@ -135,7 +142,7 @@
         <u @click="alternateRepostManicime">{{ allowRepostManicTime ? 'Hide ' : 'Only ' }} repost ManicTime</u>
       </div>
       <md-snackbar v-if="!errorMessage" :md-active.sync="showSnackbar" md-persistent>
-        <span>Yay! Your entries has been logged to Jira✌️</span>
+        <span class="white" >Yay! Your entries has been logged to Jira ✌️</span>
       </md-snackbar>
     </div>
     <md-toolbar v-if="errorMessage" class="md-accent error-message md-layout md-alignment-center-center">
@@ -179,13 +186,14 @@ export default {
       weekdayMonday: true,
       saveDates: false,
       useTogglColors: true,
-      showJiraIssueInfo: false,
+      showJiraIssueInfo: true,
       reverseLogs: true,
       theme: '',
       manicTimeEnabled: false,
       manicTimeServer: '',
       manicTimeToken: '',
       manicTimeTimeline: '',
+      manicTimeAllowRepost: false,
       allowRepostManicTime: false,
     };
   },
@@ -224,7 +232,7 @@ export default {
         endDate: initalEndDate,
         saveDates: false,
         useTogglColors: true,
-        showJiraIssueInfo: false,
+        showJiraIssueInfo: true,
         reverseLogs: true,
         manicTimeEnabled: false,
         manicTimeServer: '',
@@ -264,8 +272,10 @@ export default {
   
   mounted() {
     let localTheme = localStorage.getItem('theme'); //gets stored theme value if any
-    document.documentElement.setAttribute('data-theme', localTheme); // updates the data-theme attribute
-    this.theme = localTheme;
+    if(localTheme != null){
+      document.documentElement.setAttribute('data-theme', localTheme); // updates the data-theme attribute
+      this.theme = localTheme;
+    }
   },
 
   methods: {
@@ -325,8 +335,6 @@ export default {
             headers: headers
           })
             .then(function (response) {
-              // _self.isSaving = false;
-              // _self.showSnackbar = true;
               _self.checkIfAlreadyLogged(log);
               // _self.checkedLogs = [];
               // _self.syncAllLogs = false;
@@ -421,8 +429,19 @@ export default {
           _self.worklogsJira.push(response.data);
           worklogs.forEach(function (worklog) {
             _self.findLogInWorklogs(log, worklog);
+            _self.$forceUpdate();
           });
         });
+    },
+
+    getLocalLog(id){
+      const _self = this;
+        let logIndex = _self.logs.findIndex((i) => i.id === id);
+        if (typeof _self.logs[logIndex] !== 'undefined') {
+          return _self.logs[logIndex];
+        }
+
+        return null;
     },
 
     findLogInWorklogs(log, worklog){
@@ -462,7 +481,7 @@ export default {
         if (typeof log.pid !== 'undefined') {
           _self.projectsToggl.forEach(function (projectToggl) {
             if (log.pid === projectToggl.id) {
-              const parsedIssue = _self.matchIssueId(issue.data.data.name);
+              const parsedIssue = _self.matchIssueId(projectToggl.name);
               if (parsedIssue) {
                 log.projectID = parsedIssue[0];
                 log.projectData = projectToggl;
@@ -487,6 +506,11 @@ export default {
               if (parsedIssue) {
                 log.projectID = parsedIssue[0];
                 log.projectData = issue.data.data;
+                let localLog = _self.getLocalLog(log.id);
+                if(localLog){
+                  localLog.projectID = parsedIssue[0];
+                  localLog.projectData = issue.data.data;
+                }
                 resolve(parsedIssue[0]);
               } else {
                 log.projectID = null;
@@ -573,11 +597,10 @@ export default {
             await _self
               .getIssue(log)
               .then(async function (issueName) {
-                let logObject = log;
-                logObject.isSynced = false;
-                logObject.isSyncedManicTime = false;
-                logObject.issue = issueName;
-                logObject.checked = '';
+                log.isSynced = false;
+                log.isSyncedManicTime = false;
+                log.issue = issueName;
+                log.checked = '';
 
                 if (_self.jiraMerge) {
                   let logIndex = _self.logs.findIndex(
@@ -585,30 +608,31 @@ export default {
                   );
                   if (logIndex !== -1) {
                     _self.logs[logIndex].duration =
-                      _self.logs[logIndex].duration + logObject.duration;
+                      _self.logs[logIndex].duration + log.duration;
                   } else {
-                    _self.logs.push(logObject);
+                    _self.logs.push(log);
                   }
                 } else {
-                  _self.logs.push(logObject);
+                  _self.logs.push(log);
                 }
 
                 _self.checkIfAlreadyLogged(log);
-
-                if(_self.showJiraIssueInfo)
-                  await _self.getIssueFromJira(log);
+                if(_self.jiraIssueInDescription)
+                  _self.getIssueFromJira(log);
+                
               })
               .catch(function (log) {
                 // There is no ID for the entry but we still need to print it out to the user
-                let logObject = log;
-                logObject.isSynced = false;
-                logObject.isSyncedManicTime = false;
-                logObject.issue = 'NO ID';
-                logObject.checked = '';
-                _self.logs.push(logObject);
+                log.isSynced = false;
+                log.isSyncedManicTime = false;
+                log.issue = 'NO ID';
+                log.checked = '';
+                _self.logs.push(log);
               });
 
-              await new Promise(resolve => setTimeout(resolve, 50));  //Delay to avoid to many requests (error 429)
+              await _self.delay(50);  //Delay to avoid to many requests (error 429)
+              
+
           } // });
           _self.blockFetch = false;
         })
@@ -626,6 +650,12 @@ export default {
                 : error.response;
           }
         });
+        
+        // await _self.getIssuesJira();
+    },
+
+    delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
     },
 
     totalDuration (synced = false) {
@@ -736,14 +766,16 @@ export default {
       }
     },
 
-    getIssuesJira(){
+    async getIssuesJira(){
       let _self = this;
       if(_self.showJiraIssueInfo)
-        _self.logs.forEach(function (log) {
+        for(let i = 0; i < _self.logs.length; i++){
+          let log = _self.logs[i];
           if (log.issue && log.issue !== '') {
+            //await _self.getIssueFromJira(log);
             _self.getIssueFromJira(log);
           }
-        });
+        };
     },
 
     async getIssueFromJira(log){
@@ -758,6 +790,11 @@ export default {
       _self.issuesJira.forEach(function (issueJira) {
         if (id === issueJira.key) {
           log.issueJira = issueJira;
+          let localLog = _self.getLocalLog(log.id);
+          if(localLog){
+            localLog.issueJira =issueJira;
+          }
+          _self.$forceUpdate();
           return;
         }
       });
@@ -768,10 +805,11 @@ export default {
           let issueJira = response.data;
           _self.worklogsJira.push(issueJira);
           log.issueJira = issueJira;
-          let logIndex = _self.logs.findIndex((i) => i.id === log.id);
-          if (typeof _self.logs[logIndex] !== 'undefined') {
-            _self.logs[logIndex].issueJira = issueJira;
+          let localLog = _self.getLocalLog(log.id);
+          if(localLog){
+            localLog.issueJira = issueJira;
           }
+          _self.$forceUpdate();
         });
     },
 
@@ -802,8 +840,18 @@ export default {
       }
     },
 
-    toggleTheme() {
-      this.theme = this.theme == 'darkMode' ? '' : 'darkMode';
+    getStartEnd(log){
+      if(log.duration){
+        const duration = Number(log.duration);
+        const start = new Date(log.start);
+        const end = new Date(start.getTime() + (duration * 1000));
+        return moment(start).format("HH:mm:ss") + " -> " + moment(end).format("HH:mm:ss");
+      }
+      return "";
+    },
+
+    async toggleTheme() {
+      this.theme = this.theme == 'lightMode' ? '' : 'lightMode';
       document.documentElement.setAttribute('data-theme', this.theme);
       localStorage.setItem('theme', this.theme);
     },
@@ -979,14 +1027,14 @@ img {
 .tooltip {
   position: relative;
   display: inline-block;
-  border-bottom: 1px dotted black;
+  /* border-bottom: 1px dotted black; */
 }
 
 .tooltip .tooltiptext {
   visibility: hidden;
   width: 150px;
-  background-color: #555;
-  color: #fff;
+  background-color: var(--md-theme-default-background-tooltip);
+  /* color: #fff; */
   text-align: center;
   border-radius: 6px;
   padding: 5px 0;
@@ -994,6 +1042,10 @@ img {
   z-index: 1;
   opacity: 0;
   transition: opacity 0.3s;
+}
+
+.tooltipup{
+  position: initial;
 }
 
 .tooltiptext-top {
@@ -1012,10 +1064,18 @@ img {
 
 .tooltip .tooltiptextright {
   top: -5%;
-  left: 120%;
+  left: 100%;
   width: 325px;
   white-space: pre-line;
   padding: 1px 5px;
+}
+
+.tooltip .tooltiptextdate {
+  padding: 2px 0;
+  width: 150;
+  top: 125%;
+  left: 50%;
+  margin-left: -75px;
 }
 
 .tooltip .tooltiptext::after {
@@ -1026,17 +1086,24 @@ img {
   margin-left: -5px;
   border-width: 5px;
   border-style: solid;
-  border-color: #555 transparent transparent transparent;
+  border-color: var(--md-theme-default-background-tooltip) transparent transparent transparent;
 }
 
-.tooltiptextright::after {
-  content: "";
+.tooltip .tooltiptextright::after {
+  content: " ";
   position: absolute;
-
-  right: 100%;
+  top: 25%;
   margin-top: -5px;
-  border-width: 5px;
-  border-style: solid;
+  border-color: transparent var(--md-theme-default-background-tooltip) transparent transparent !important;
+  left: auto;
+  right: 100%;
+}
+
+.tooltip .tooltiptextdate::after {
+  top:auto;
+  bottom: 100%;
+  left: 50%;
+  border-color: transparent transparent var(--md-theme-default-background-tooltip) transparent;
 }
 
 .tooltip:hover .tooltiptext {
@@ -1059,6 +1126,10 @@ img {
   min-width: 5px;
   width: 15px;
   font-size: 14px !important;
+}
+
+.white {
+  color: white;
 }
 
 /* Theme Part */
@@ -1171,28 +1242,6 @@ svg{
 }
 
 :root {
-    /* --primary-color: #302AE6;
-    --secondary-color: #536390;
-    --font-color: #424242;
-    --bg-color: #fff;
-    --heading-color: #292922; */
-    --md-theme-default-primary: black;
-    --md-theme-default-primary-transparent: rgba(255, 255, 255, 0.85);
-    --md-theme-default-background: white;
-    --md-theme-default-background-2: white;
-    --md-theme-default-background-3: rgba(0, 0, 0, 0.85);
-    --md-theme-default-background-4: rgba(0, 0, 0, 0.5);
-    --md-theme-default-background-5: rgba(0, 0, 0, 0.20);
-    --md-theme-default-accent-on-background: #ff5252;
-    --md-theme-default-divider-on-background: rgba(0,0,0,0.12);
-}
-
-[data-theme="darkMode"] {
-    /* --primary-color: #9A97F3;
-    --secondary-color: #818cab;
-    --font-color: #e1e1ff;
-    --bg-color: #161625;
-    --heading-color: #818cab; */
     --md-theme-default-primary: white;
     --md-theme-default-primary-transparent: rgba(0, 0, 0, 0.85);
     --md-theme-default-background: #1d1d1d;
@@ -1200,7 +1249,21 @@ svg{
     --md-theme-default-background-3: rgba(255, 255, 255, 0.85);
     --md-theme-default-background-4: rgba(255, 255, 255, 0.5);
     --md-theme-default-background-5: rgba(255, 255, 255, 0.20);
+    --md-theme-default-background-tooltip: #555;
     --md-theme-default-accent-on-background: #ff5252;
     --md-theme-default-divider-on-background: rgba(255,255,255,0.12);
+}
+
+[data-theme="lightMode"] {
+    --md-theme-default-primary: black;
+    --md-theme-default-primary-transparent: rgba(255, 255, 255, 0.85);
+    --md-theme-default-background: white;
+    --md-theme-default-background-2: white;
+    --md-theme-default-background-3: rgba(0, 0, 0, 0.85);
+    --md-theme-default-background-4: rgba(0, 0, 0, 0.5);
+    --md-theme-default-background-5: rgba(0, 0, 0, 0.20);
+    --md-theme-default-background-tooltip: #ebebeb;
+    --md-theme-default-accent-on-background: #ff5252;
+    --md-theme-default-divider-on-background: rgba(0,0,0,0.12);
 }
 </style>
