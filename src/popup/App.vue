@@ -73,7 +73,7 @@
               </md-table-cell>
               <md-table-cell class="no-wrap">
                 <div class="tooltip tooltipup">
-                  <a v-if="log.issue != 'NO ID'" :href="jiraUrl + '/browse/' + log.issue" target="_blank" :style="{color:getLogColor(log)}">
+                  <a v-if="log.issue != 'NO ID'" :href="jiraUrl + '/browse/' + log.issue" target="_blank" :style="getIssueLinkStyle(log)">
                   {{ log.issue }}</a>
                   <a v-else>{{ log.issue }}</a>
                   
@@ -82,7 +82,7 @@
                   </span>
                 </div>
               </md-table-cell>
-              <md-table-cell>
+              <md-table-cell class="row-description">
                 <div class="tooltip">
                   <p><span v-html="getLogDescriptionPanel(log)"></span></p>
                   <span class="tooltiptext tooltiptext-top tooltiptextmax">{{getProjectInfo(log)}}</span>
@@ -197,6 +197,7 @@ export default {
       saveDates: false,
       useTogglColors: true,
       showJiraIssueInfo: true,
+      issueStatusFormat: true,
       reverseLogs: true,
       theme: '',
       manicTimeEnabled: false,
@@ -243,6 +244,7 @@ export default {
         saveDates: false,
         useTogglColors: true,
         showJiraIssueInfo: true,
+        issueStatusFormat: true,
         reverseLogs: true,
         manicTimeEnabled: false,
         manicTimeServer: '',
@@ -266,6 +268,7 @@ export default {
         _self.saveDates = setting.saveDates;
         _self.useTogglColors = setting.useTogglColors;
         _self.showJiraIssueInfo = setting.showJiraIssueInfo;
+        _self.issueStatusFormat = setting.issueStatusFormat;
         _self.reverseLogs = setting.reverseLogs;
         if (_self.saveDates) {
           _self.startDate = setting.startDate;
@@ -289,6 +292,7 @@ export default {
   },
 
   methods: {
+
     refreshEntries () {
       if (this.saveDates) {
         this.saveActualDates();
@@ -299,273 +303,6 @@ export default {
       this.worklogsJira = [];
       this.issuesJira = [];
       this.fetchEntries();
-    },
-
-    processJiraDescription (description) {
-      const _self = this;
-      if (_self.worklogDescriptionSplit && _self.stringSplit) {
-        if (description.includes(_self.stringSplit)) {
-          return description
-            .split(_self.stringSplit)
-            .slice(1)
-            .join(_self.stringSplit);
-        }
-      }
-
-      return description;
-    },
-
-    async syncToJira () {
-      const _self = this;
-      const headers = {
-        'X-Atlassian-Token': 'no-check'
-      };
-
-      _self.blockFetch = true;
-      _self.isSaving = true;
-      const awaitingIssues = {};
-      for (let log of this.checkedLogs) {
-        if(!_self.manicTimeEnabled || !_self.allowRepostManicTime){
-          if (log.issue in awaitingIssues) {
-            await awaitingIssues[log.issue];
-          }
-          const promise = axios({
-            method: 'post',
-            url:
-              _self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog',
-            data: {
-              timeSpentSeconds: log.duration,
-              comment: _self.processJiraDescription(
-                _self.worklogWihtoutDescription
-                  ? log.description.replace(log.issue, '')
-                  : log.description
-              ),
-              started: _self.toJiraDateTime(log.start)
-            },
-            headers: headers
-          })
-            .then(function (response) {
-              _self.checkIfAlreadyLogged(log);
-              // _self.checkedLogs = [];
-              // _self.syncAllLogs = false;
-            })
-            .catch(function (error) {
-              _self.errorMessage = error;
-            })
-            .finally(function () {
-              delete awaitingIssues[log.issue];
-            });
-          awaitingIssues[log.issue] = promise;
-
-          if (!_self.jiraMerge) {
-            await promise;
-          }
-        }
-
-        if(_self.jiraUrl.includes("xoia"))
-          _self.showEasterEgg();
-
-        if(_self.manicTimeEnabled)
-            await _self.pushLogsToManicTime(log);
-      }
-
-      _self.blockFetch = false;
-      _self.isSaving = false;
-      _self.showSnackbar = true;
-    },
-
-    toJiraDateTime (date) {
-      let parsedDate = Date.parse(date);
-      let jiraDate = Date.now();
-      if (parsedDate) {
-        const offset = new Date().getTimezoneOffset();
-        jiraDate = new Date(parsedDate - offset * 60 * 1000);
-      }
-      let dateString = jiraDate.toISOString();
-      let timeZoneString;
-      timeZoneString = new Date().toString().match(/([-+][0-9]+)\s/)[1];
-      dateString = dateString.replace('Z', timeZoneString);
-      return dateString;
-    },
-
-    doSyncAllLogs () {
-      let _self = this;
-      if (this.syncAllLogs) {
-        _self.logs.forEach(function (log) {
-          if (log.issue !== 'NO ID' && !log.isSynced) {
-            _self.checkedLogs.push(log);
-          }
-        });
-      } else {
-        this.checkedLogs = [];
-      }
-    },
-
-    formatDuration (duration) {
-      duration = Number(duration);
-
-      if (duration < 0) {
-        return 'WIP';
-      }
-
-      if (duration < 60) {
-        return 'Too short';
-      }
-
-      let h = Math.floor(duration / 3600);
-      let m = Math.floor((duration % 3600) / 60);
-      let hDisplay = h > 0 ? h + 'h' : '';
-      let mDisplay = m > 0 ? m + 'm' : '';
-      return hDisplay + ' ' + mDisplay;
-    },
-
-    isSameStart (worklog, log) {
-      return new Date(worklog.started).getTime() === new Date(log.start).getTime();
-    },
-
-    async checkIfAlreadyLogged (log) {
-      const _self = this;
-      _self.worklogsJira.forEach(function (worklogJira) {
-        if (log.issue === worklogJira.issueID) {
-          worklogJira.worklogs.forEach(function (worklog) {
-            _self.findLogInWorklogs(log, worklog);
-          });
-          return;
-        }
-      });
-
-      await axios
-        .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog')
-        .then(function (response) {
-          let worklogs = response.data.worklogs;
-          response.data.issueID = log.issue;
-          _self.worklogsJira.push(response.data);
-          worklogs.forEach(function (worklog) {
-            _self.findLogInWorklogs(log, worklog);
-            _self.$forceUpdate();
-          });
-        });
-    },
-
-    getLocalLog(id){
-      const _self = this;
-        let logIndex = _self.logs.findIndex((i) => i.id === id);
-        if (typeof _self.logs[logIndex] !== 'undefined') {
-          return _self.logs[logIndex];
-        }
-
-        return null;
-    },
-
-    findLogInWorklogs(log, worklog){
-      const _self = this;
-      if (
-        _self.isSameStart(worklog, log) &&
-        worklog.author.emailAddress?.toLowerCase() === _self.jiraEmail?.toLowerCase()
-      ){
-        let logIndex = _self.logs.findIndex((i) => i.id === log.id);
-        if (typeof _self.logs[logIndex] !== 'undefined') {
-          _self.logs[logIndex].isSynced = true;
-          return;
-        }
-      }
-    },
-
-    matchIssueId (name) {
-      if (this.allowNumbersInId) {
-        return name.match(/^[A-Z][A-Z,0-9]*-[0-9]*/);
-      } else {
-        return name.match(/^[A-Z]*-[0-9]*/);
-      }
-    },
-
-    getIssue (log) {
-      let _self = this;
-      return new Promise(function (resolve, reject) {
-        if (_self.jiraIssueInDescription && log.description != null) {
-          const parsedIssue = _self.matchIssueId(log.description);
-          if (parsedIssue) {
-            resolve(parsedIssue[0]);
-          }
-          // reject(log);  If don't find in description, search in project title
-        } else if (log.description == null) {
-          log.description = ''; // Set empty string (not null), to avoid reference null problems
-        }
-        if (typeof log.pid !== 'undefined') {
-          _self.projectsToggl.forEach(function (projectToggl) {
-            if (log.pid === projectToggl.id) {
-              const parsedIssue = _self.matchIssueId(projectToggl.name);
-              if (parsedIssue) {
-                log.projectID = parsedIssue[0];
-                log.projectData = projectToggl;
-                resolve(parsedIssue[0]);
-              } else {
-                log.projectID = null;
-                reject(log);
-              }
-              return;
-            }
-          });
-
-          axios.get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization':
-                'Basic ' + btoa(_self.togglApiToken + ':api_token')
-            }
-          }).then(function (issue) {
-              _self.projectsToggl.push(issue.data.data);
-              const parsedIssue = _self.matchIssueId(issue.data.data.name);
-              if (parsedIssue) {
-                log.projectID = parsedIssue[0];
-                log.projectData = issue.data.data;
-                let localLog = _self.getLocalLog(log.id);
-                if(localLog){
-                  localLog.projectID = parsedIssue[0];
-                  localLog.projectData = issue.data.data;
-                }
-                resolve(parsedIssue[0]);
-              } else {
-                log.projectID = null;
-                reject(log);
-              }
-          });
-        } else {
-          reject(log);
-        }
-      });
-    },
-
-    getDescriptionID(log){
-      if(log.description != null && log.description != ''){
-        const parsedIssue = _self.matchIssueId(log.description);
-        if (parsedIssue) {
-          return parsedIssue[0];
-        }
-      }
-      return null;
-    },
-
-    getProjectID(log){
-      if (typeof log.pid !== 'undefined') {
-        axios
-          .get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
-            headers: {
-              Authorization:
-                'Basic ' + btoa(_self.togglApiToken + ':api_token')
-            }
-          })
-          .then(function (issue) {
-            const parsedIssue = _self.matchIssueId(issue.data.data.name);
-            if (parsedIssue) {
-              resolve(parsedIssue[0]);
-            } else {
-              reject(log);
-            }
-          });
-      } else {
-        reject(log);
-      }
     },
 
     async fetchEntries () {
@@ -630,7 +367,7 @@ export default {
                 }
 
                 _self.checkIfAlreadyLogged(log);
-                if(_self.jiraIssueInDescription)
+                if(_self.showJiraIssueInfo)
                   _self.getIssueFromJira(log);
                 
               })
@@ -665,6 +402,291 @@ export default {
         });
         
         // await _self.getIssuesJira();
+    },
+
+    getIssue (log) {
+      let _self = this;
+      return new Promise(function (resolve, reject) {
+        if (_self.jiraIssueInDescription && log.description != null) {
+          const parsedIssue = _self.matchIssueId(log.description);
+          if (parsedIssue) {
+            resolve(parsedIssue[0]);
+          }
+          // reject(log);  If don't find in description, search in project title
+        } else if (log.description == null) {
+          log.description = ''; // Set empty string (not null), to avoid reference null problems
+        }
+        if (typeof log.pid !== 'undefined') {
+          _self.projectsToggl.forEach(function (projectToggl) {
+            if (log.pid === projectToggl.id) {
+              const parsedIssue = _self.matchIssueId(projectToggl.name);
+              if (parsedIssue) {
+                log.projectID = parsedIssue[0];
+                log.projectData = projectToggl;
+                resolve(parsedIssue[0]);
+              } else {
+                log.projectID = null;
+                reject(log);
+              }
+              return;
+            }
+          });
+
+          axios.get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization':
+                'Basic ' + btoa(_self.togglApiToken + ':api_token')
+            }
+          }).then(function (issue) {
+              _self.projectsToggl.push(issue.data.data);
+              const parsedIssue = _self.matchIssueId(issue.data.data.name);
+              if (parsedIssue) {
+                log.projectID = parsedIssue[0];
+                log.projectData = issue.data.data;
+                let localLog = _self.getLocalLog(log.id);
+                if(localLog){
+                  localLog.projectID = parsedIssue[0];
+                  localLog.projectData = issue.data.data;
+                }
+                resolve(parsedIssue[0]);
+              } else {
+                log.projectID = null;
+                reject(log);
+              }
+          });
+        } else {
+          reject(log);
+        }
+      });
+    },
+
+    async checkIfAlreadyLogged (log) {
+      const _self = this;
+      _self.worklogsJira.forEach(function (worklogJira) {
+        if (log.issue === worklogJira.issueID) {
+          worklogJira.worklogs.forEach(function (worklog) {
+            _self.findLogInWorklogs(log, worklog);
+          });
+          return;
+        }
+      });
+
+      await axios
+        .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog')
+        .then(function (response) {
+          let worklogs = response.data.worklogs;
+          response.data.issueID = log.issue;
+          _self.worklogsJira.push(response.data);
+          worklogs.forEach(function (worklog) {
+            _self.findLogInWorklogs(log, worklog);
+            _self.$forceUpdate();
+          });
+        });
+    },
+
+    async getIssueFromJira(log){
+      const _self = this;
+      let id = log.issue;
+      if( (id == null || id == '') && log.projectID != null && log.projectID != '')
+        id = log.projectID;
+
+      if( id == null || id == '' || id == "NO ID" )
+        return;
+
+      _self.issuesJira.forEach(function (issueJira) {
+        if (id === issueJira.key) {
+          log.issueJira = issueJira;
+          let localLog = _self.getLocalLog(log.id);
+          if(localLog){
+            localLog.issueJira =issueJira;
+          }
+          _self.$forceUpdate();
+          return;
+        }
+      });
+
+      await axios
+        .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue)
+        .then(function (response) {
+          let issueJira = response.data;
+          _self.worklogsJira.push(issueJira);
+          log.issueJira = issueJira;
+          let localLog = _self.getLocalLog(log.id);
+          if(localLog){
+            localLog.issueJira = issueJira;
+          }
+          _self.$forceUpdate();
+        });
+    },
+
+    async syncToJira () {
+      const _self = this;
+      const headers = {
+        'X-Atlassian-Token': 'no-check'
+      };
+
+      _self.blockFetch = true;
+      _self.isSaving = true;
+      const awaitingIssues = {};
+      for (let log of this.checkedLogs) {
+        if(!_self.onlyManicTimePost() && _self.isValidJiraLog(log)){
+          if (log.issue in awaitingIssues) {
+            await awaitingIssues[log.issue];
+          }
+          const promise = axios({
+            method: 'post',
+            url:
+              _self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog',
+            data: {
+              timeSpentSeconds: log.duration,
+              comment: _self.processJiraDescription(
+                _self.worklogWihtoutDescription
+                  ? log.description.replace(log.issue, '')
+                  : log.description
+              ),
+              started: _self.toJiraDateTime(log.start)
+            },
+            headers: headers
+          })
+            .then(function (response) {
+              _self.checkIfAlreadyLogged(log);
+            })
+            .catch(function (error) {
+              _self.errorMessage = error;
+            })
+            .finally(function () {
+              delete awaitingIssues[log.issue];
+            });
+          awaitingIssues[log.issue] = promise;
+
+          if (!_self.jiraMerge) {
+            await promise;
+          }
+        }
+
+        _self.checkedLogs = [];
+
+        if(_self.jiraUrl.includes("xoia"))
+          _self.showEasterEgg();
+
+        if(_self.manicTimeEnabled)
+            await _self.pushLogsToManicTime(log);
+      }
+
+      _self.blockFetch = false;
+      _self.isSaving = false;
+      _self.syncAllLogs = false;
+      _self.showSnackbar = true;
+    },
+
+    matchIssueId (name) {
+      if (this.allowNumbersInId) {
+        return name.match(/^[A-Z][A-Z,0-9]*-[0-9]*/);
+      } else {
+        return name.match(/^[A-Z]*-[0-9]*/);
+      }
+    },
+
+    getDescriptionID(log){
+      if(log.description != null && log.description != ''){
+        const parsedIssue = _self.matchIssueId(log.description);
+        if (parsedIssue) {
+          return parsedIssue[0];
+        }
+      }
+      return null;
+    },
+    
+    processJiraDescription (description) {
+      const _self = this;
+      if (_self.worklogDescriptionSplit && _self.stringSplit) {
+        if (description.includes(_self.stringSplit)) {
+          return description
+            .split(_self.stringSplit)
+            .slice(1)
+            .join(_self.stringSplit);
+        }
+      }
+
+      return description;
+    },
+
+    isValidJiraLog(log){
+      return log != null && !log.isSynced && log.issue != null && log.issue != 'NO ID' && log.duration > 59;
+    },
+
+    isSameStart (worklog, log) {
+      return new Date(worklog.started).getTime() === new Date(log.start).getTime();
+    },
+
+    toJiraDateTime (date) {
+      let parsedDate = Date.parse(date);
+      let jiraDate = Date.now();
+      if (parsedDate) {
+        const offset = new Date().getTimezoneOffset();
+        jiraDate = new Date(parsedDate - offset * 60 * 1000);
+      }
+      let dateString = jiraDate.toISOString();
+      let timeZoneString;
+      timeZoneString = new Date().toString().match(/([-+][0-9]+)\s/)[1];
+      dateString = dateString.replace('Z', timeZoneString);
+      return dateString;
+    },
+
+    doSyncAllLogs () {
+      let _self = this;
+      if (this.syncAllLogs) {
+        _self.logs.forEach(function (log) {
+          if (_self.isValidJiraLog(log)) {
+            _self.checkedLogs.push(log);
+          }
+        });
+      } else {
+        this.checkedLogs = [];
+      }
+    },
+
+    formatDuration (duration) {
+      duration = Number(duration);
+
+      if (duration < 0) {
+        return 'WIP';
+      }
+
+      if (duration < 60) {
+        return 'Too short';
+      }
+
+      let h = Math.floor(duration / 3600);
+      let m = Math.floor((duration % 3600) / 60);
+      let hDisplay = h > 0 ? h + 'h' : '';
+      let mDisplay = m > 0 ? m + 'm' : '';
+      return hDisplay + ' ' + mDisplay;
+    },
+
+    getLocalLog(id){
+      const _self = this;
+        let logIndex = _self.logs.findIndex((i) => i.id === id);
+        if (typeof _self.logs[logIndex] !== 'undefined') {
+          return _self.logs[logIndex];
+        }
+
+        return null;
+    },
+
+    findLogInWorklogs(log, worklog){
+      const _self = this;
+      if (
+        _self.isSameStart(worklog, log) &&
+        worklog.author.emailAddress?.toLowerCase() === _self.jiraEmail?.toLowerCase()
+      ){
+        let logIndex = _self.logs.findIndex((i) => i.id === log.id);
+        if (typeof _self.logs[logIndex] !== 'undefined') {
+          _self.logs[logIndex].isSynced = true;
+          return;
+        }
+      }
     },
 
     delay(ms) {
@@ -760,11 +782,43 @@ export default {
       }
     },
 
+    getIssueLinkStyle(log){
+      const _self = this;
+      let output = "color: " + this.getLogColor(log) + "; ";
+      if(_self.issueStatusFormat)
+        output += _self.getFontIssueStatus(_self.getIssueStatus(log));
+      
+
+      return output;
+    },
+
     getLogColor(log){
       if(this.useTogglColors && log.projectData && log.projectData.hex_color){
         return log.projectData.hex_color;
       }else{
         return "";
+      }
+    },
+
+    getProjectID(log){
+      if (typeof log.pid !== 'undefined') {
+        axios
+          .get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
+            headers: {
+              Authorization:
+                'Basic ' + btoa(_self.togglApiToken + ':api_token')
+            }
+          })
+          .then(function (issue) {
+            const parsedIssue = _self.matchIssueId(issue.data.data.name);
+            if (parsedIssue) {
+              resolve(parsedIssue[0]);
+            } else {
+              reject(log);
+            }
+          });
+      } else {
+        reject(log);
       }
     },
 
@@ -775,7 +829,7 @@ export default {
         else
           return log.projectData.name;
       }else{
-        return "No Project Info";
+        return "No Project Info (Toggl)";
       }
     },
 
@@ -791,65 +845,99 @@ export default {
         };
     },
 
-    async getIssueFromJira(log){
-      const _self = this;
-      let id = log.issue;
-      if( (id == null || id == '') && log.projectID != null && log.projectID != '')
-        id = log.projectID;
-
-      if( id == null || id == '' || id == "NO ID" )
-        return;
-
-      _self.issuesJira.forEach(function (issueJira) {
-        if (id === issueJira.key) {
-          log.issueJira = issueJira;
-          let localLog = _self.getLocalLog(log.id);
-          if(localLog){
-            localLog.issueJira =issueJira;
-          }
-          _self.$forceUpdate();
-          return;
-        }
-      });
-
-      await axios
-        .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue)
-        .then(function (response) {
-          let issueJira = response.data;
-          _self.worklogsJira.push(issueJira);
-          log.issueJira = issueJira;
-          let localLog = _self.getLocalLog(log.id);
-          if(localLog){
-            localLog.issueJira = issueJira;
-          }
-          _self.$forceUpdate();
-        });
-    },
-
     getIssueInfo(log){
       if(log.issueJira){
+        const _self = this;
+        const fields = log.issueJira.fields;
         let output = "<i>" + log.issueJira.fields.summary + "</i><br>";
-        try{
-          output += log.issueJira.fields.issuetype.name + " - ";
-          output += "<b>" + log.issueJira.fields.status.name + "</b> - ";
-          output += log.issueJira.fields.priority.name + "<br>";
-          output += (log.issueJira.fields.timespent/3600).toFixed(2) + "h";
-          if(log.issueJira.fields.timeestimate && log.issueJira.fields.timeestimate > 0)
-            output += " / " + (log.issueJira.fields.timeestimate/3600).toFixed(2) + "h";
-          output += " (" +  log.issueJira.fields.progress.percent + "%)<br>";
-          if(log.issueJira.fields.assignee){
-            output += log.issueJira.fields.assignee.displayName;
+        // try{
+          output += fields.issuetype.name + " - ";
+          const status = this.getIssueStatus(log);
+          if(_self.issueStatusFormat && status > 0){
+            output += '<span style="font-weight:bold; color: ' + this.getColorIssueStatus(status) +  ' ">'; 
+            output += fields.status.name + "</span> - ";
+          }else
+            output += '<span style="font-weight:bold;">' + fields.status.name + "</span> - ";
+
+          output += fields.priority.name + "<br>";
+          output += (fields.timespent/3600).toFixed(2) + "h";
+          if(fields.timeoriginalestimate && fields.timeoriginalestimate > 0)
+              output += " / " + (fields.timeoriginalestimate/3600).toFixed(2) + "h";
+
+          let started = false;
+          if(fields.timeestimate && fields.timeestimate > 0){
+              output += " ( -" + (fields.timeestimate/3600).toFixed(2) + "h";
+              started = true;
+          }
+
+          if(fields.progress.percent && fields.progress.percent !== 'undefined'){
+            if(!started)
+              output += " ( ";
+            else
+              output += " | ";
+            output += "<b>" + fields.progress.percent + "%</b> )";
+          }else if(started){
+            output += " )";
+          }
+
+          if(fields.assignee){
+            output += "<br>" + fields.assignee.displayName;
           }else{
-            output += "Unassigned";
+            output += "<br>Unassigned";
           }
             
-        }catch{
+        // }catch{
 
-        }
+        // }
 
         return output;
       }else{
         return "No Issue Info";
+      }
+    },
+
+    getIssueStatus(log){
+      if(log && log.issueJira && log.issueJira.fields.status){
+        const status = log.issueJira.fields.status.name;
+        if(["Backlog"].includes(status))
+          return 1;
+        if(["To Do","Selected for Development", "Bloqueado"].includes(status))
+          return 2;
+        if(["In Progress","Para verificar",].includes(status))
+          return 3;
+        if(["Done","Closed","Periódica"].includes(status))
+          return 4;
+      }
+      return 0; //Unkown
+    },
+
+    getColorIssueStatus(status){
+      switch(status){
+        case 1:
+          return "rgb(155, 155, 155)";
+        case 2:
+          return "rgb(180,180,0)";
+        case 3:
+          return "rgb(100 156 239);";
+        case 4:
+          return "rgb(0 135 90)";
+        default:
+          return "white";
+      }
+    },
+
+    getFontIssueStatus(status){
+      switch(status){
+        case 1:
+          return "font-style: italic;";
+        case 2:
+          return "text-decoration: overline;";
+        case 3:
+          return "font-weight: bold;";
+        case 4:
+          return "text-decoration: line-through;";
+        default:
+          return "";
       }
     },
 
@@ -915,6 +1003,11 @@ export default {
       });
 
       return promise;
+    },
+
+    onlyManicTimePost(){
+      const _self = this;
+      return _self.manicTimeEnabled && _self.allowRepostManicTime;
     },
 
     alternateRepostManicime(log, data, retry = true){
@@ -1149,6 +1242,10 @@ img {
   bottom: 0px;
   position: relative;
   font-size: 12px;
+}
+
+.row-description{
+  min-width: 275px;
 }
 
 .manicTimeIconChecked {
