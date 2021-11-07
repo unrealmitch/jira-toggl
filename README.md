@@ -65,6 +65,6 @@ Zip file is located in `dist-zip` folder.
 
 ## License
 
-Copyright &copy; 2019 Simon Eldevig
+Copyright &copy; 2019 Simon Eldevig, 2021 Miguel Mosquera
 
 Licensed under the [MIT License](LICENSE)

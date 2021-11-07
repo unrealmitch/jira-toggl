@@ -93,3 +93,6 @@ dist/
 #JetBrains IDEA
 .idea
 /src/icons/Sin título-1.cpt
+
+#Image Memes for Xoia
+/src/easteregg/*

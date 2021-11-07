@@ -74,6 +74,7 @@ const config = {
     }),
     new CopyWebpackPlugin([
       { from: 'icons', to: 'icons', ignore: ['icon.xcf'] },
+	  { from: 'easteregg', to: 'easteregg', ignore: ['*.cpt'] },
       { from: 'popup/popup.html', to: 'popup/popup.html', transform: transformHtml },
       { from: 'options/options.html', to: 'options/options.html', transform: transformHtml },
       {

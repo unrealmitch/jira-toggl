@@ -17,8 +17,8 @@
               <md-icon>autorenew</md-icon>
             </md-button>
             <md-button @click="toggleTheme" class="md-icon-button">
-                <md-icon v-if="this.theme == 'lightMode'">light_mode</md-icon>
-                <md-icon v-else>dark_mode</md-icon>     
+                <md-icon v-if="this.theme == 'lightMode'">dark_mode</md-icon>
+                <md-icon v-else>light_mode</md-icon>     
             </md-button>
             <a href="../options/options.html" target="_blank">
               <md-button class="md-icon-button">
@@ -73,7 +73,9 @@
               </md-table-cell>
               <md-table-cell class="no-wrap">
                 <div class="tooltip tooltipup">
-                  <a v-if="log.issue != 'NO ID'" :href="jiraUrl + '/browse/' + log.issue" target="_blank" :style="getIssueLinkStyle(log)">
+                  <a v-if="log.issue != 'NO ID'" :href="jiraUrl + '/browse/' + log.issue" target="_blank" :style="getIssueLinkStyle(log)" 
+                  @contextmenu.prevent.stop="menuIssueClicked($event, log)"
+                  >
                   {{ log.issue }}</a>
                   <a v-else>{{ log.issue }}</a>
                   
@@ -84,7 +86,7 @@
               </md-table-cell>
               <md-table-cell class="row-description">
                 <div class="tooltip">
-                  <p><span v-html="getLogDescriptionPanel(log)"></span></p>
+                  <p><span v-html="getLogDescriptionPanel(log)" @contextmenu.prevent.stop="menuIssueClicked($event, log)"></span></p>
                   <span class="tooltiptext tooltiptext-top tooltiptextmax">{{getProjectInfo(log)}}</span>
                 </div>
               </md-table-cell>
@@ -145,11 +147,10 @@
         <span class="white" >Yay! Your entries has been logged to Jira ✌️</span>
       </md-snackbar>
 
-      <div id="modaleg" class="modal">
-        <!-- Modal content -->
+      <div id="modaleg" class="modal" v-on:click="hideEasterEgg">
         <div class="modal-content" id="modal-content-eg">
           <div class="modal-body">
-            <img style="width:100%" src="/icons/easteregg.png" alt="Fiscaliza!">
+            <img id="eastereggimg" style="width:100%" src="" alt="Fiscaliza!">
           </div>
         </div>
       </div>
@@ -158,8 +159,19 @@
     <md-toolbar v-if="errorMessage" class="md-accent error-message md-layout md-alignment-center-center">
       <p class="error-msg">{{ errorMessage }}</p>
     </md-toolbar>
+
+    <vue-simple-context-menu
+      :elementId="'contextMenuIssue'"
+      :options="optionMenuIssue"
+      :ref="'contextMenuIssue'"
+      @option-clicked="optionIssueClicked"
+    />
   </div>
+
+
 </template>
+
+
 
 <script>
 import axios from 'axios';
@@ -206,6 +218,42 @@ export default {
       manicTimeTimeline: '',
       manicTimeAllowRepost: false,
       allowRepostManicTime: false,
+      easterEggs:[],
+      optionMenuIssue: [
+        {
+          name: '<b>Start</b>',
+        },
+        {
+          name: 'Open',
+        },
+        {
+          type: 'divider'
+        },
+        {
+          name: 'Backlog',
+          transition: 11
+        },
+        {
+          name: 'To Do',
+          transition: 61
+        },
+        {
+          name: 'Bloqueado',
+          transition: 71
+        },
+        {
+          name: 'In Progress',
+          transition: 31
+        },
+        {
+          name: 'Para verificar',
+          transition: 51
+        },
+        {
+          name: 'Done',
+          transition: 41
+        }
+      ]
     };
   },
 
@@ -289,6 +337,7 @@ export default {
       document.documentElement.setAttribute('data-theme', localTheme); // updates the data-theme attribute
       this.theme = localTheme;
     }
+    this.importAll(require.context('../easteregg', false, /\.(png|jpe?g|svg|gif)$/));
   },
 
   methods: {
@@ -1015,24 +1064,143 @@ export default {
     },
 
     async showEasterEgg(){
-      const modal = document.getElementById("modaleg");
-      const modalcontent = document.getElementById("modal-content-eg");
-      modalcontent.classList.remove('modalclose');
-      modalcontent.classList.add('modalopen');
-      modal.classList.remove('modalFadeOut');
-      modal.classList.add('modalfadeIn');
-      modal.style.display = "block";
-      await this.delay(2000);
-      modalcontent.classList.remove('modalopen');
-      modalcontent.classList.add('modalclose');
-      modal.classList.remove('modalfadeIn');
-      modal.classList.add('modalFadeOut');
-      await this.delay(350);
-      modal.style.display = "none";
+      const _self = this;
+      if(_self.jiraUrl.includes("xoia") && _self.easterEggs.length > 0){
+        const img = document.getElementById('eastereggimg');
+        img.src = "/easteregg/" + this.randomEasterEgg();
+        const modal = document.getElementById("modaleg");
+        const modalcontent = document.getElementById("modal-content-eg");
+        modalcontent.classList.remove('modalclose');
+        modalcontent.classList.add('modalopen');
+        modal.classList.remove('modalFadeOut');
+        modal.classList.add('modalfadeIn');
+        modal.style.display = "block";
+        await this.delay(2750);
+        if(modal.style.display != "none"){
+          this.hideEasterEgg();
+        }
+      }
+    },
+
+    async hideEasterEgg(){
+        const modal = document.getElementById("modaleg");
+        const modalcontent = document.getElementById("modal-content-eg");
+        modalcontent.classList.remove('modalopen');
+        modalcontent.classList.add('modalclose');
+        modal.classList.remove('modalfadeIn');
+        modal.classList.add('modalFadeOut');
+        await this.delay(350);
+        modal.style.display = "none";
+    },
+
+    randomEasterEgg(){
+      const random = Math.floor(Math.random() * this.easterEggs.length);
+      return this.easterEggs[random];
+    },
+
+    importAll(r) {
+      r.keys().forEach(key => (this.easterEggs.push(key)));
+    },
+
+    openContentMenu(e, log){
+      e.preventDefault();
+      const menu = document.getElementById("custom-menu-" + log.id);
+      menu.style.display = "table";
+    },
+
+    menuIssueClicked(event, item) {
+      this.$refs.contextMenuIssue.showMenu(event, item)
+    },
+
+    optionIssueClicked (event) {
+      const _self = this;
+      const log = event.item;
+      const option = event.option;
+      if(option.name === "<b>Start</b>"){
+        _self.optionStartToggl(log);
+      }else if(option.name === "Open" ){
+        browser.tabs.create({
+          url: _self.jiraUrl + '/browse/' + log.issue,
+          active: false
+        });
+      }else if(option.transition != null && option.transition !== "undefined"){
+        _self.optionChangeStateToggl(log,option);
+      }else{
+        alert("Invalid option!");
+      }
+    },
+
+    async optionStartToggl(log){
+      
+      // if (confirm("Do you want Start Toggl -> " + log.issue + " ?\n" + log.description)) {
+        const _self = this;
+        const data = JSON.stringify({
+          "time_entry": {
+            "description": log.description,
+            "pid": log.pid,
+            "tags": [
+              "T2J-Created"
+            ],
+            "created_with":"T2J"
+          }
+        })
+        var axios = require('axios');
+        var config = {
+          method: 'post',
+          url: 'https://api.track.toggl.com/api/v8/time_entries/start',
+          headers: { 
+            'Authorization': 'Basic ' + btoa(_self.togglApiToken + ':api_token'),
+            'Content-Type': 'text/plain'
+          },
+          data: data,
+          payload: data
+        };
+
+        await axios(config)
+        .then(function (response) {
+          alert("Toggl started with " + log.issue);
+        })
+        .catch(function (error) {
+          alert("Error: " + error);
+          console.log(error);
+        });
+      // }
+    },
+
+    async optionChangeStateToggl(log, option){
+      if (true || confirm("Do you want change Jira Issue Status " + log.issue + "?\n" +
+          log.issueJira.fields.status.name + " -> " + option.name + "\n" + log.issueJira.fields.summary)) 
+      {
+        const _self = this;
+        await axios({
+          method: 'post',
+          url:
+            _self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/transitions',
+          data: {
+            transition: {
+              id: option.transition
+            }
+          },
+          headers: {
+          'X-Atlassian-Token': 'no-check'
+          }
+        })
+        .then(function (response) {
+          console.log("Issue status changed: " + log.issue + " -> " + option.name);
+          if(log.issueJira && log.issueJira.fields.status.name){
+            log.issueJira.fields.status.name = option.name;
+            _self.$forceUpdate();
+          }
+        })
+        .catch(function (error) {
+          alert(error);
+        });
+      }
     }
 
   }
 };
+
 </script>
 
 <style>
@@ -1259,6 +1427,43 @@ img {
   color: white;
 }
 
+.custom-menu {
+    display: none;
+    z-index: 1000;
+    position: absolute;
+    overflow: hidden;
+    border: 1px solid #CCC;
+    white-space: nowrap;
+    font-family: sans-serif;
+    background: var(--md-theme-default-background-2);
+    color: #333;
+    border-radius: 5px;
+}
+
+.custom-menu li {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--md-theme-default-primary);
+}
+
+.vue-simple-context-menu{
+  background: var(--md-theme-default-background-2) !important;
+  position: fixed !important;
+  box-shadow: 0 3px 10px 2px rgb(125 125 125 / 50%) !important;
+}
+
+.vue-simple-context-menu__item{
+  background: var(--md-theme-default-background-2) !important;
+}
+
+.vue-simple-context-menu__item:hover {
+  background-color: var(--md-theme-default-accent-on-background) !important;
+}
+
+.custom-menu li:hover {
+    background-color: var(--md-theme-default-accent-on-background);
+}
+
 /* The Modal (background) */
 .modal {
   display: none; /* Hidden by default */
@@ -1289,7 +1494,7 @@ img {
 .modal-content {
   position: fixed;
   width: 250px;
-  right: 0px;
+  right: 18px;
   bottom: 0;
   width: 250px;
 }
