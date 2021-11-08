@@ -179,6 +179,13 @@ import moment from 'moment';
 
 const initalStartDate = new Date(moment().startOf('day'));
 const initalEndDate = new Date(moment().endOf('day'));
+const jiraHeaders = {
+  'X-Atlassian-Token': 'no-check',
+  'Content-Type': 'application/json; charset=UTF-8',
+  'User-Agent': 'dummyValue',
+  'Accept': 'application/json'
+};
+
 
 export default {
   data () {
@@ -596,7 +603,7 @@ export default {
               ),
               started: _self.toJiraDateTime(log.start)
             },
-            headers: headers
+            headers: jiraHeaders
           })
             .then(function (response) {
               _self.checkIfAlreadyLogged(log);
@@ -1124,7 +1131,7 @@ export default {
           active: false
         });
       }else if(option.transition != null && option.transition !== "undefined"){
-        _self.optionChangeStateToggl(log,option);
+        _self.optionChangeStateJira(log,option);
       }else{
         alert("Invalid option!");
       }
@@ -1167,7 +1174,7 @@ export default {
       // }
     },
 
-    async optionChangeStateToggl(log, option){
+    async optionChangeStateJira(log, option){
       if (true || confirm("Do you want change Jira Issue Status " + log.issue + "?\n" +
           log.issueJira.fields.status.name + " -> " + option.name + "\n" + log.issueJira.fields.summary)) 
       {
@@ -1181,9 +1188,7 @@ export default {
               id: option.transition
             }
           },
-          headers: {
-          'X-Atlassian-Token': 'no-check'
-          }
+          headers: jiraHeaders
         })
         .then(function (response) {
           console.log("Issue status changed: " + log.issue + " -> " + option.name);

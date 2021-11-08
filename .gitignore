@@ -96,3 +96,4 @@ dist/
 
 #Image Memes for Xoia
 /src/easteregg/*
+!/**/.gitkeep
