@@ -79,7 +79,7 @@
                   {{ log.issue }}</a>
                   <a v-else>{{ log.issue }}</a>
                   
-                  <span v-if="showJiraIssueInfo" class="tooltiptextright tooltiptext" >
+                  <span v-if="getJiraIssueInfo" class="tooltiptextright tooltiptext" >
                     <p><span v-html="getIssueInfo(log)"></span></p>
                   </span>
                 </div>
@@ -144,7 +144,7 @@
         <u @click="alternateRepostManicime">{{ allowRepostManicTime ? 'Hide ' : 'Only ' }} repost ManicTime</u>
       </div>
       <md-snackbar v-if="!errorMessage" :md-active.sync="showSnackbar" md-persistent>
-        <span class="white" >Yay! Your entries has been logged to Jira ✌️</span>
+        <span class="white" v-html="msgSnackbar"></span> 
       </md-snackbar>
 
       <div id="modaleg" class="modal" v-on:click="hideEasterEgg">
@@ -157,7 +157,7 @@
 
     </div>
     <md-toolbar v-if="errorMessage" class="md-accent error-message md-layout md-alignment-center-center">
-      <p class="error-msg">{{ errorMessage }}</p>
+      <span class="error-msg" v-html="errorMessage"></span>
     </md-toolbar>
 
     <vue-simple-context-menu
@@ -168,9 +168,7 @@
     />
   </div>
 
-
 </template>
-
 
 
 <script>
@@ -211,13 +209,16 @@ export default {
       togglApiToken: '',
       isSaving: false,
       showSnackbar: false,
+      msgSnackbar: "Yay! Your entries has been logged to Jira ✌️",
       blockFetch: false,
       weekdayMonday: true,
       saveDates: false,
       useTogglColors: true,
-      showJiraIssueInfo: true,
+      getJiraIssueInfo: true,
       issueStatusFormat: true,
       reverseLogs: true,
+      transitions: null,
+      needConfirmTransition: false,
       theme: '',
       manicTimeEnabled: false,
       manicTimeServer: '',
@@ -228,39 +229,12 @@ export default {
       easterEggs:[],
       optionMenuIssue: [
         {
-          name: '<b>Start</b>',
+          name: '<b>Start</b> in toggl',
         },
         {
-          name: 'Open',
-        },
-        {
-          type: 'divider'
-        },
-        {
-          name: 'Backlog',
-          transition: 11
-        },
-        {
-          name: 'To Do',
-          transition: 61
-        },
-        {
-          name: 'Bloqueado',
-          transition: 71
-        },
-        {
-          name: 'In Progress',
-          transition: 31
-        },
-        {
-          name: 'Para verificar',
-          transition: 51
-        },
-        {
-          name: 'Done',
-          transition: 41
+          name: '<b>Open</b> new tab',
         }
-      ]
+      ],
     };
   },
 
@@ -298,9 +272,11 @@ export default {
         endDate: initalEndDate,
         saveDates: false,
         useTogglColors: true,
-        showJiraIssueInfo: true,
+        getJiraIssueInfo: true,
         issueStatusFormat: true,
         reverseLogs: true,
+        transitions: null,
+        needConfirmTransition: false,
         manicTimeEnabled: false,
         manicTimeServer: '',
         manicTimeToken: '',
@@ -322,9 +298,11 @@ export default {
         _self.weekdayMonday = setting.weekdayMonday;
         _self.saveDates = setting.saveDates;
         _self.useTogglColors = setting.useTogglColors;
-        _self.showJiraIssueInfo = setting.showJiraIssueInfo;
-        _self.issueStatusFormat = setting.issueStatusFormat;
+        _self.getJiraIssueInfo = setting.getJiraIssueInfo;
+        _self.issueStatusFormat = setting.issueStatusFormat && setting.getJiraIssueInfo;
         _self.reverseLogs = setting.reverseLogs;
+        _self.transitions = setting.transitions;
+        _self.needConfirmTransition = setting.needConfirmTransition;
         if (_self.saveDates) {
           _self.startDate = setting.startDate;
           _self.endDate = setting.endDate;
@@ -335,6 +313,8 @@ export default {
         _self.manicTimeToken = setting.manicTimeToken;
         _self.manicTimeTimeline = setting.manicTimeTimeline;
         _self.manicTimeAllowRepost = setting.manicTimeAllowRepost;
+
+        _self.parseTransitions(_self.transitions);
       });
   },
   
@@ -350,15 +330,18 @@ export default {
   methods: {
 
     refreshEntries () {
-      if (this.saveDates) {
-        this.saveActualDates();
+      const _self = this;
+      if (_self.saveDates) {
+        _self.saveActualDates();
       }
-      this.checkedLogs = [];
-      this.logs = [];
-      this.projectsToggl = [];
-      this.worklogsJira = [];
-      this.issuesJira = [];
-      this.fetchEntries();
+      _self.checkedLogs = [];
+      _self.logs = [];
+      _self.projectsToggl = [];
+      _self.worklogsJira = [];
+      _self.issuesJira = [];
+      _self.fetchEntries();
+      _self.errorMessage = null;
+      _self.showSnackbar = false;
     },
 
     async fetchEntries () {
@@ -423,7 +406,7 @@ export default {
                 }
 
                 _self.checkIfAlreadyLogged(log);
-                if(_self.showJiraIssueInfo)
+                if(_self.getJiraIssueInfo)
                   _self.getIssueFromJira(log);
                 
               })
@@ -582,6 +565,8 @@ export default {
         'X-Atlassian-Token': 'no-check'
       };
 
+      _self.errorMessage = null;
+      _self.showSnackbar = false;
       _self.blockFetch = true;
       _self.isSaving = true;
       const awaitingIssues = {};
@@ -633,6 +618,7 @@ export default {
       _self.blockFetch = false;
       _self.isSaving = false;
       _self.syncAllLogs = false;
+      _self.msgSnackbar = "<b>Yay!</b> Your entries has been logged to Jira ✌️";
       _self.showSnackbar = true;
     },
 
@@ -891,7 +877,7 @@ export default {
 
     async getIssuesJira(){
       let _self = this;
-      if(_self.showJiraIssueInfo)
+      if(_self.getJiraIssueInfo)
         for(let i = 0; i < _self.logs.length; i++){
           let log = _self.logs[i];
           if (log.issue && log.issue !== '') {
@@ -954,29 +940,29 @@ export default {
 
     getIssueStatus(log){
       if(log && log.issueJira && log.issueJira.fields.status){
-        const status = log.issueJira.fields.status.name;
-        if(["Backlog"].includes(status))
-          return 1;
-        if(["To Do","Selected for Development", "Bloqueado"].includes(status))
-          return 2;
-        if(["In Progress","Para verificar",].includes(status))
-          return 3;
-        if(["Done","Closed","Periódica"].includes(status))
-          return 4;
+        const status = log.issueJira.fields.status;
+        if(status.name.toLowerCase() === "10002" || status.id == 10002)
+          return 0;
+        else
+          return status.statusCategory.id;
+
+        //0-> Backlog 1-> Undefined  2-> To Do 3-> Done 4-> In Progress
       }
-      return 0; //Unkown
+      return -1; //Unkown
     },
 
     getColorIssueStatus(status){
       switch(status){
-        case 1:
-          return "rgb(155, 155, 155)";
-        case 2:
+        case 0: //Backlog
+          return "rgb(150, 150, 150)";
+        case 1: //Undefined
+          return "rgb(255,164,164)";
+        case 2: //To Do
           return "rgb(180,180,0)";
-        case 3:
+        case 4: //In Progress
           return "rgb(100 156 239);";
-        case 4:
-          return "rgb(0 135 90)";
+        case 3: //Done
+          return "rgb(37 167 8)";
         default:
           return "white";
       }
@@ -984,13 +970,13 @@ export default {
 
     getFontIssueStatus(status){
       switch(status){
-        case 1:
+        case 0: //Backlog
           return "font-style: italic;";
-        case 2:
+        case 2: //To Do
           return "text-decoration: overline;";
-        case 3:
+        case 4: //In Progress
           return "font-weight: bold;";
-        case 4:
+        case 3: //Done
           return "text-decoration: line-through;";
         default:
           return "";
@@ -1123,9 +1109,9 @@ export default {
       const _self = this;
       const log = event.item;
       const option = event.option;
-      if(option.name === "<b>Start</b>"){
+      if(option === _self.optionMenuIssue[0]){
         _self.optionStartToggl(log);
-      }else if(option.name === "Open" ){
+      }else if(option === _self.optionMenuIssue[1]){
         browser.tabs.create({
           url: _self.jiraUrl + '/browse/' + log.issue,
           active: false
@@ -1165,20 +1151,24 @@ export default {
 
         await axios(config)
         .then(function (response) {
-          alert("Toggl started with " + log.issue);
+          _self.msgSnackbar = "Toggl started with <b>" + log.issue + "</b>✌️";
+          _self.showSnackbar = true;
         })
         .catch(function (error) {
-          alert("Error: " + error);
           console.log(error);
+          _self.msgSnackbar = '<span style="color:red;font-weight:bold">ERROR!</span> See console for more details 😢';
+          _self.showSnackbar = true;
         });
       // }
     },
 
     async optionChangeStateJira(log, option){
-      if (true || confirm("Do you want change Jira Issue Status " + log.issue + "?\n" +
+      const _self = this;
+      if ( !_self.needConfirmTransition || confirm("Do you want change Jira Issue Status " + log.issue + "?\n" +
           log.issueJira.fields.status.name + " -> " + option.name + "\n" + log.issueJira.fields.summary)) 
       {
-        const _self = this;
+        _self.errorMessage = "";
+        _self.showSnackbar = false;
         await axios({
           method: 'post',
           url:
@@ -1190,18 +1180,52 @@ export default {
           },
           headers: jiraHeaders
         })
-        .then(function (response) {
-          console.log("Issue status changed: " + log.issue + " -> " + option.name);
-          if(log.issueJira && log.issueJira.fields.status.name){
-            log.issueJira.fields.status.name = option.name;
-            _self.$forceUpdate();
-          }
+        .then(async function (response) {
+          await _self.getIssueFromJira(log);
+          _self.msgSnackbar = "Issue status changed: <b>" + log.issue + '</b> -> <span style="color:' +
+                              _self.getColorIssueStatus(_self.getIssueStatus(log)) +  
+                              ';font-weight:bold">' + log.issueJira.fields.status.name + "</span> ✌️";
+          _self.showSnackbar = true;
         })
-        .catch(function (error) {
-          alert(error);
+        .catch(async function (error) {
+          console.log(error.response);
+          if(error.response !== null && error.response.status === 400 && 
+             error.response.data !== null && error.response.data.errorMessages !== null && 
+             error.response.data.errorMessages.length > 0 && 
+             error.response.data.errorMessages[0].includes("not valid for this issue."))
+          {
+              const urlTransitions = _self.jiraUrl + "/rest/api/latest/issue/" + log.issue + "/transitions";
+              _self.errorMessage = '<span style="color:;font-weight:bold">ERROR:</span> Not valid transition<b> ' + 
+                                  option.transition + '</b> for issue <b>' + log.issue + '</b> 😢 ' + 
+                                  '<a href="' + urlTransitions +'" target=_blank>See Valid Transitions</a>';
+              _self.showSnackbar = true;
+          }else{
+            _self.msgSnackbar = '<span style="color:red;font-weight:bold">ERROR:</span> updating state of <b>' + log.issue + '</b>! See console for more details 😢';
+            _self.showSnackbar = true;
+          }
         });
       }
-    }
+    },
+
+    parseTransitions(transitions){
+      const _self = this;
+      if(_self.getJiraIssueInfo && transitions !== null && transitions !== "undefined" && 
+         transitions !== '' && transitions.length > 0)
+      {
+        const pairTransitions = transitions.split(";");
+        _self.optionMenuIssue.push({type: 'divider'});
+        pairTransitions.forEach(function (rawPair) {
+          const pair = rawPair.split(":");
+          if(pair.length == 2 && pair[0] !== "undefined" && pair[1] !== "undefined"){
+            const transition = {
+              name: pair[0].trim(),
+              transition: pair[1].trim()
+            }
+            _self.optionMenuIssue.push(transition);
+          }
+        });
+      }
+    },
 
   }
 };

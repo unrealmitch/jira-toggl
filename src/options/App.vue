@@ -39,9 +39,17 @@
           <md-checkbox v-model="saveDates">Save dates (Persistent start and end dates)</md-checkbox><br>
           <md-checkbox v-model="weekdayMonday">Start week on monday</md-checkbox><br>
           <md-checkbox v-model="useTogglColors">Use Toggl project colors in issue link</md-checkbox><br>
-          <md-checkbox v-model="showJiraIssueInfo">Show Jira Info over Issue link (get info from jira issues)</md-checkbox><br>
-          <md-checkbox v-model="issueStatusFormat">Use issue status to set the text color/format of issue link/description</md-checkbox><br>
           <md-checkbox v-model="reverseLogs">Show newest logs at top (logs date in descending order)</md-checkbox><br>
+
+          <br>
+          <h3>Jira Options</h3>
+          <md-checkbox v-model="getJiraIssueInfo">Get Jira issues info (Show Jira info over Issue link)</md-checkbox><br>
+          <md-checkbox v-if="getJiraIssueInfo" v-model="issueStatusFormat">Use issue jira status to set the text color/format of issue link/description</md-checkbox><br>
+          <md-checkbox v-if="getJiraIssueInfo" v-model="needConfirmTransition">Request confirmation for issue status change</md-checkbox><br>
+          <md-field v-if="getJiraIssueInfo">
+            <label>Jira Transitions ( Name:Transition ID; Name2:Transition ID2... )</label>
+            <md-input v-model="transitions" />
+          </md-field>
           <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox><br>
           <div v-if="clockworkEnabled">
             <md-field>
@@ -50,9 +58,11 @@
             </md-field>
           </div>
 
+          <br>
+          <h3>ManicTime Options</h3>
           <md-checkbox v-model="manicTimeEnabled">Enable upload logs to ManicTime Server as Tags</md-checkbox>
           <div v-if="manicTimeEnabled">
-            <h3>ManicTime Options</h3>
+            
             <md-field>
               <label>ManicTime Server Url</label>
               <md-input v-model="manicTimeServer" />
@@ -68,12 +78,11 @@
             <md-checkbox v-model="manicTimeAllowRepost">Allow mode to only repost logs in ManicTime Server</md-checkbox><br>
           </div>
           
-          <div class="button__container">
-            <md-button class="md-raised md-accent button__item" @click="saveSettings">
-              <span v-show="!isSaving">Save settings</span>
-              <span v-show="isSaving">Saving...</span>
-            </md-button>
-          </div>
+          <md-button class="md-raised md-accent button__item" @click="saveSettings">
+            <span v-show="!isSaving">Save settings</span>
+            <span v-show="isSaving">Saving...</span>
+          </md-button>
+
           <md-snackbar :md-active.sync="showSnackbar" md-persistent>
             <span>Your settings have now been saved ✌️</span>
           </md-snackbar>
@@ -105,14 +114,16 @@ export default {
       weekdayMonday: true,
       saveDates: false,
       useTogglColors: true,
-      showJiraIssueInfo: true,
+      getJiraIssueInfo: true,
       issueStatusFormat: true,
       reverseLogs: true,
+      transitions: null,
+      needConfirmTransition: false,
       manicTimeEnabled: false,
       manicTimeServer: '',
       manicTimeToken: '',
       manicTimeTimeline: '',
-      manicTimeAllowRepost: false
+      manicTimeAllowRepost: false,
     };
   },
   created () {
@@ -133,9 +144,11 @@ export default {
       weekdayMonday: true,
       saveDates: false,
       useTogglColors: true,
-      showJiraIssueInfo: true,
+      getJiraIssueInfo: true,
       issueStatusFormat: true,
       reverseLogs: true,
+      transitions: "Backlog:11; To Do:61; Blocked:71; In Progress: 31; In Review:51; Done: 41",
+      needConfirmTransition: false,
       manicTimeEnabled: false,
       manicTimeServer: '',
       manicTimeToken: '',
@@ -156,9 +169,11 @@ export default {
       _self.weekdayMonday = setting.weekdayMonday;
       _self.saveDates = setting.saveDates;
       _self.useTogglColors = setting.useTogglColors;
-      _self.showJiraIssueInfo = setting.showJiraIssueInfo;
+      _self.getJiraIssueInfo = setting.getJiraIssueInfo;
       _self.issueStatusFormat = setting.issueStatusFormat;
       _self.reverseLogs = setting.reverseLogs;
+      _self.transitions = setting.transitions;
+      _self.needConfirmTransition = setting.needConfirmTransition;
       _self.manicTimeEnabled = setting.manicTimeEnabled;
       _self.manicTimeServer = setting.manicTimeServer;
       _self.manicTimeToken = setting.manicTimeToken;
@@ -186,9 +201,11 @@ export default {
         weekdayMonday: _self.weekdayMonday,
         saveDates: _self.saveDates,
         useTogglColors: _self.useTogglColors,
-        showJiraIssueInfo: _self.showJiraIssueInfo,
+        getJiraIssueInfo: _self.getJiraIssueInfo,
         issueStatusFormat: _self.issueStatusFormat,
         reverseLogs: _self.reverseLogs,
+        transitions: _self.transitions,
+        needConfirmTransition: _self.needConfirmTransition,
         manicTimeEnabled: _self.manicTimeEnabled,
         manicTimeServer: _self.manicTimeServer,
         manicTimeToken: _self.manicTimeToken,
@@ -208,12 +225,10 @@ export default {
     padding: 20px;
   }
 
-  .button__container {
-    display: flex;
-    justify-content: flex-end;
-  }
-
   .button__item {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
     background: var(--md-theme-default-accent) !important;
     background-color: var(--md-theme-default-accent)!important;
   }
