@@ -177,13 +177,6 @@ import moment from 'moment';
 
 const initalStartDate = new Date(moment().startOf('day'));
 const initalEndDate = new Date(moment().endOf('day'));
-const jiraHeaders = {
-  'X-Atlassian-Token': 'no-check',
-  'Content-Type': 'application/json; charset=UTF-8',
-  'User-Agent': 'dummyValue',
-  'Accept': 'application/json'
-};
-
 
 export default {
   data () {
@@ -218,6 +211,7 @@ export default {
       issueStatusFormat: true,
       reverseLogs: true,
       transitions: null,
+      allowTransitionByTogglDescription: true,
       needConfirmTransition: false,
       theme: '',
       manicTimeEnabled: false,
@@ -235,6 +229,12 @@ export default {
           name: '<b>Open</b> new tab',
         }
       ],
+      jiraHeaders: {
+        'X-Atlassian-Token': 'no-check',
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json'
+      },
+
     };
   },
 
@@ -275,8 +275,9 @@ export default {
         getJiraIssueInfo: true,
         issueStatusFormat: true,
         reverseLogs: true,
-        transitions: null,
+        transitions: "To Do:11;In Progress:21;Done:31",
         needConfirmTransition: false,
+        allowTransitionByTogglDescription: true,
         manicTimeEnabled: false,
         manicTimeServer: '',
         manicTimeToken: '',
@@ -302,6 +303,7 @@ export default {
         _self.issueStatusFormat = setting.issueStatusFormat && setting.getJiraIssueInfo;
         _self.reverseLogs = setting.reverseLogs;
         _self.transitions = setting.transitions;
+        _self.allowTransitionByTogglDescription = setting.allowTransitionByTogglDescription;
         _self.needConfirmTransition = setting.needConfirmTransition;
         if (_self.saveDates) {
           _self.startDate = setting.startDate;
@@ -325,6 +327,11 @@ export default {
       this.theme = localTheme;
     }
     this.importAll(require.context('../easteregg', false, /\.(png|jpe?g|svg|gif)$/));
+
+    //Fix for firefox to avoid problem 403: XSRF check failed (In chrome shouldn't change User-Agent)
+    if(navigator.userAgent.indexOf('Firefox') !== -1) {
+      this.jiraHeaders['User-Agent'] =  'toggl2jira';
+    }
   },
 
   methods: {
@@ -533,6 +540,8 @@ export default {
       if( id == null || id == '' || id == "NO ID" )
         return;
 
+      let cached = false;
+
       _self.issuesJira.forEach(function (issueJira) {
         if (id === issueJira.key) {
           log.issueJira = issueJira;
@@ -541,22 +550,25 @@ export default {
             localLog.issueJira =issueJira;
           }
           _self.$forceUpdate();
-          return;
+          cached = true;
+
         }
       });
 
-      await axios
-        .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue)
-        .then(function (response) {
-          let issueJira = response.data;
-          _self.worklogsJira.push(issueJira);
-          log.issueJira = issueJira;
-          let localLog = _self.getLocalLog(log.id);
-          if(localLog){
-            localLog.issueJira = issueJira;
-          }
-          _self.$forceUpdate();
-        });
+      if(!cached){
+        await axios
+          .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue)
+          .then(function (response) {
+            let issueJira = response.data;
+            _self.worklogsJira.push(issueJira);
+            log.issueJira = issueJira;
+            let localLog = _self.getLocalLog(log.id);
+            if(localLog){
+              localLog.issueJira = issueJira;
+            }
+            _self.$forceUpdate();
+          });
+      }
     },
 
     async syncToJira () {
@@ -588,7 +600,7 @@ export default {
               ),
               started: _self.toJiraDateTime(log.start)
             },
-            headers: jiraHeaders
+            headers: _self.jiraHeaders
           })
             .then(function (response) {
               _self.checkIfAlreadyLogged(log);
@@ -604,12 +616,12 @@ export default {
           if (!_self.jiraMerge) {
             await promise;
           }
+
+          if(_self.allowTransitionByTogglDescription)
+            await _self.transitionByTogglDescription(log);
         }
 
         _self.checkedLogs = [];
-
-        if(_self.jiraUrl.includes("xoia"))
-          _self.showEasterEgg();
 
         if(_self.manicTimeEnabled)
             await _self.pushLogsToManicTime(log);
@@ -620,6 +632,9 @@ export default {
       _self.syncAllLogs = false;
       _self.msgSnackbar = "<b>Yay!</b> Your entries has been logged to Jira ✌️";
       _self.showSnackbar = true;
+
+      if(_self.jiraUrl.includes("xoia"))
+        _self.showEasterEgg();
     },
 
     matchIssueId (name) {
@@ -1124,7 +1139,6 @@ export default {
     },
 
     async optionStartToggl(log){
-      
       // if (confirm("Do you want Start Toggl -> " + log.issue + " ?\n" + log.description)) {
         const _self = this;
         const data = JSON.stringify({
@@ -1162,9 +1176,9 @@ export default {
       // }
     },
 
-    async optionChangeStateJira(log, option){
+    async optionChangeStateJira(log, option, promt = true){
       const _self = this;
-      if ( !_self.needConfirmTransition || confirm("Do you want change Jira Issue Status " + log.issue + "?\n" +
+      if ( promt ||  !_self.needConfirmTransition || confirm("Do you want change Jira Issue Status " + log.issue + "?\n" +
           log.issueJira.fields.status.name + " -> " + option.name + "\n" + log.issueJira.fields.summary)) 
       {
         _self.errorMessage = "";
@@ -1178,18 +1192,20 @@ export default {
               id: option.transition
             }
           },
-          headers: jiraHeaders
+          headers: _self.jiraHeaders
         })
         .then(async function (response) {
           await _self.getIssueFromJira(log);
           _self.msgSnackbar = "Issue status changed: <b>" + log.issue + '</b> -> <span style="color:' +
                               _self.getColorIssueStatus(_self.getIssueStatus(log)) +  
                               ';font-weight:bold">' + log.issueJira.fields.status.name + "</span> ✌️";
-          _self.showSnackbar = true;
+          if(promt)
+            _self.showSnackbar = true;
+          _self.updateStatusOfLogs(log);
         })
         .catch(async function (error) {
           console.log(error.response);
-          if(error.response !== null && error.response.status === 400 && 
+          if(promt && error.response !== null && error.response.status === 400 && 
              error.response.data !== null && error.response.data.errorMessages !== null && 
              error.response.data.errorMessages.length > 0 && 
              error.response.data.errorMessages[0].includes("not valid for this issue."))
@@ -1199,11 +1215,50 @@ export default {
                                   option.transition + '</b> for issue <b>' + log.issue + '</b> 😢 ' + 
                                   '<a href="' + urlTransitions +'" target=_blank>See Valid Transitions</a>';
               _self.showSnackbar = true;
-          }else{
+          }else if(promt){
             _self.msgSnackbar = '<span style="color:red;font-weight:bold">ERROR:</span> updating state of <b>' + log.issue + '</b>! See console for more details 😢';
             _self.showSnackbar = true;
           }
         });
+      }
+    },
+
+    async transitionByTogglDescription(log){
+      const _self = this;
+
+      if( log.description === null || log.description === "undefined")
+        return;
+        
+      const togglDescription = log.description.toLowerCase();
+
+      let transition = null;
+      _self.optionMenuIssue.forEach(_transition => {
+
+        if(_transition.name != null && togglDescription.includes("#" + _transition.name.toLowerCase())){
+          transition = _transition;
+        }
+      });
+
+      if(transition != null && transition.transition !== "undefined"){
+        const search = "#" + transition.name;
+        if(log.description.includes(search))
+          log.description = log.description.replace(search, "<b><u>" + search + "</u></b>");
+        else
+          log.description = log.description.replace(search.toLowerCase(), "<b><u>" + search.toLowerCase() + "</u></b>");
+        await _self.optionChangeStateJira(log,transition,false);
+      }
+    },
+
+    updateStatusOfLogs(baseLog){
+      const _self = this;
+      const issueJira = baseLog.issueJira;
+      if(issueJira.key != null){
+        _self.logs.forEach(log => {
+          if(baseLog != log && log != null && log.issue == issueJira.key){
+            log.issueJira = issueJira;
+          }
+        });
+        _self.$forceUpdate();
       }
     },
 
@@ -1216,12 +1271,14 @@ export default {
         _self.optionMenuIssue.push({type: 'divider'});
         pairTransitions.forEach(function (rawPair) {
           const pair = rawPair.split(":");
-          if(pair.length == 2 && pair[0] !== "undefined" && pair[1] !== "undefined"){
+          if(pair.length == 2 && pair[0] !== "undefined" && pair[1] !== "undefined" && pair[0].length > 0 && pair[1].length > 0){
             const transition = {
               name: pair[0].trim(),
               transition: pair[1].trim()
             }
             _self.optionMenuIssue.push(transition);
+          }else if(pair.length == 1 && pair[0].trim() == "break" ){
+            _self.optionMenuIssue.push({type: 'divider'});
           }
         });
       }

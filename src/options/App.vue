@@ -5,7 +5,10 @@
         <md-toolbar md-elevation="0">
           <div class="md-layout md-alignment-center-left">
             <img src="/icons/jira-toggl_48.png" alt="Avatar">
-            <h3 class="md-title">Toggl To Jira Settings</h3>
+            <h3 class="md-title">Toggl To Jira</h3>
+            <a href="https://github.com/unrealmitch/jira-toggl#readme" target="_blank" style="position: absolute; right: 20px;font-weight: bold;">
+              See Documentation for help
+            </a> 
           </div>
         </md-toolbar>
       </div>
@@ -46,8 +49,9 @@
           <md-checkbox v-model="getJiraIssueInfo">Get Jira issues info (Show Jira info over Issue link)</md-checkbox><br>
           <md-checkbox v-if="getJiraIssueInfo" v-model="issueStatusFormat">Use issue jira status to set the text color/format of issue link/description</md-checkbox><br>
           <md-checkbox v-if="getJiraIssueInfo" v-model="needConfirmTransition">Request confirmation for issue status change</md-checkbox><br>
+          <md-checkbox v-if="getJiraIssueInfo" v-model="allowTransitionByTogglDescription">Change status of issue if toggl description log contains #NameTranstion <i>(like smartcommits, example: TASK-1 #Done)</i></md-checkbox><br>
           <md-field v-if="getJiraIssueInfo">
-            <label>Jira Transitions ( Name:Transition ID; Name2:Transition ID2... )</label>
+            <label>Jira Transitions ( Name:Transition ID; Name2:Transition ID2... ) <i>For classic projects use or add the next:</i> Backlog:11; To Do:61; Blocked:71; In Progress: 31; In Review:51; Done: 41;</label>
             <md-input v-model="transitions" />
           </md-field>
           <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox><br>
@@ -119,6 +123,7 @@ export default {
       reverseLogs: true,
       transitions: null,
       needConfirmTransition: false,
+      allowTransitionByTogglDescription: true,
       manicTimeEnabled: false,
       manicTimeServer: '',
       manicTimeToken: '',
@@ -147,8 +152,9 @@ export default {
       getJiraIssueInfo: true,
       issueStatusFormat: true,
       reverseLogs: true,
-      transitions: "Backlog:11; To Do:61; Blocked:71; In Progress: 31; In Review:51; Done: 41",
+      transitions: "To Do:11;In Progress:21;Done:31",
       needConfirmTransition: false,
+      allowTransitionByTogglDescription: true,
       manicTimeEnabled: false,
       manicTimeServer: '',
       manicTimeToken: '',
@@ -174,6 +180,7 @@ export default {
       _self.reverseLogs = setting.reverseLogs;
       _self.transitions = setting.transitions;
       _self.needConfirmTransition = setting.needConfirmTransition;
+      _self.allowTransitionByTogglDescription = setting.allowTransitionByTogglDescription;
       _self.manicTimeEnabled = setting.manicTimeEnabled;
       _self.manicTimeServer = setting.manicTimeServer;
       _self.manicTimeToken = setting.manicTimeToken;
@@ -206,6 +213,7 @@ export default {
         reverseLogs: _self.reverseLogs,
         transitions: _self.transitions,
         needConfirmTransition: _self.needConfirmTransition,
+        allowTransitionByTogglDescription: _self.allowTransitionByTogglDescription,
         manicTimeEnabled: _self.manicTimeEnabled,
         manicTimeServer: _self.manicTimeServer,
         manicTimeToken: _self.manicTimeToken,

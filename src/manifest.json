@@ -32,5 +32,11 @@
   "options_ui": {
     "page": "options/options.html",
     "chrome_style": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{9c4e2bb1-4e58-47b3-bed9-015e5b92136a}",
+      "update_url": "https://shared.mmosquera.es/Extensions/Jira2Toggl/updates.json"
+    }
   }
 }
