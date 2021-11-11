@@ -13,7 +13,7 @@
                 <md-icon>timer</md-icon>
               </md-button>
             </a>
-            <md-button class="md-icon-button" @click="refreshEntries">
+            <md-button :disabled="isSaving" class="md-icon-button" @click="refreshEntries">
               <md-icon>autorenew</md-icon>
             </md-button>
             <md-button @click="toggleTheme" class="md-icon-button">
@@ -29,13 +29,13 @@
         </md-toolbar>
       </div>
     </div>
-    <div class="button-reset-float">
+    <div v-if="!isSaving" class="button-reset-float">
       <u @click="moveToday">Reset dates</u>
     </div>
 
     <div class="inner-container">
       <div class="md-layout md-gutter">
-        <md-button :disabled="blockFetch" class="md-icon-button material-icons button-navigation-calendar" @click="dayMinus">
+        <md-button :disabled="isSaving" class="md-icon-button material-icons button-navigation-calendar" @click="dayMinus">
           <md-icon>navigate_before</md-icon>
         </md-button>
 
@@ -47,7 +47,7 @@
           <span class="datepicker-label md-caption">End date</span>
           <md-datepicker v-model="endDate" :readonly="blockFetch" md-immediately />
         </div>
-        <md-button :disabled="blockFetch" class="md-icon-button material-icons button-navigation-calendar" @click="dayPlus">
+        <md-button :disabled="isSaving" class="md-icon-button material-icons button-navigation-calendar" @click="dayPlus">
           <md-icon>navigate_next</md-icon>
         </md-button>
       </div>
@@ -204,6 +204,7 @@ export default {
       showSnackbar: false,
       msgSnackbar: "Yay! Your entries has been logged to Jira ✌️",
       blockFetch: false,
+      breakFetch: false,
       weekdayMonday: true,
       saveDates: false,
       useTogglColors: true,
@@ -338,21 +339,43 @@ export default {
 
     refreshEntries () {
       const _self = this;
+
+      if (_self.blockFetch || _self.isSaving) {
+        if(!_self.isSaving)
+          _self.breakFetch = true;
+        return;
+      }
+
       if (_self.saveDates) {
         _self.saveActualDates();
       }
       _self.checkedLogs = [];
       _self.logs = [];
-      _self.projectsToggl = [];
+      // _self.projectsToggl = [];
       _self.worklogsJira = [];
       _self.issuesJira = [];
-      _self.fetchEntries();
       _self.errorMessage = null;
       _self.showSnackbar = false;
+
+      _self.fetchEntries();
+    },
+
+    async BreakFetch(){
+      const _self = this;
+      await _self.delay(200);
+      _self.breakFetch = false;
+      _self.blockFetch = false;
+      _self.refreshEntries();
     },
 
     async fetchEntries () {
       let _self = this;
+      if (_self.blockFetch) {
+        return;
+      }else{
+        _self.blockFetch = true;
+      }
+
       const offset = new Date().getTimezoneOffset();
       const sign = offset <= 0 ? '+' : '-';
       function abspad (num) { return ('0' + Math.abs(num)).slice(-2); }
@@ -368,11 +391,6 @@ export default {
         .toISOString(true)
         .replace('+00:00', timezone);
 
-      if (_self.blockFetch) {
-        return;
-      }
-
-      _self.blockFetch = true;
       await axios
         .get('https://api.track.toggl.com/api/v8/time_entries', {
           headers: {
@@ -393,6 +411,9 @@ export default {
             await _self
               .getIssue(log)
               .then(async function (issueName) {
+                if(_self.breakFetch)
+                  return;
+
                 log.isSynced = false;
                 log.isSyncedManicTime = false;
                 log.issue = issueName;
@@ -418,19 +439,29 @@ export default {
                 
               })
               .catch(function (log) {
+                
                 // There is no ID for the entry but we still need to print it out to the user
                 log.isSynced = false;
                 log.isSyncedManicTime = false;
                 log.issue = 'NO ID';
                 log.checked = '';
-                _self.logs.push(log);
+                if(!_self.breakFetch)
+                  _self.logs.push(log);
               });
+
+              if(_self.breakFetch)
+                break;
 
               await _self.delay(50);  //Delay to avoid to many requests (error 429)
               
-
           } // });
-          _self.blockFetch = false;
+
+          if(_self.breakFetch){
+            _self.BreakFetch();
+          }else{
+            _self.blockFetch = false;
+          }
+          
         })
         .catch(function (error) {
           _self.blockFetch = false;
@@ -453,22 +484,28 @@ export default {
     getIssue (log) {
       let _self = this;
       return new Promise(function (resolve, reject) {
+        let foundIssue = false;
         if (_self.jiraIssueInDescription && log.description != null) {
           const parsedIssue = _self.matchIssueId(log.description);
           if (parsedIssue) {
+            foundIssue = true;
             resolve(parsedIssue[0]);
           }
           // reject(log);  If don't find in description, search in project title
         } else if (log.description == null) {
           log.description = ''; // Set empty string (not null), to avoid reference null problems
         }
+
+        let found = false;
         if (typeof log.pid !== 'undefined') {
           _self.projectsToggl.forEach(function (projectToggl) {
-            if (log.pid === projectToggl.id) {
+            if (!found && log.pid === projectToggl.id) {
               const parsedIssue = _self.matchIssueId(projectToggl.name);
               if (parsedIssue) {
                 log.projectID = parsedIssue[0];
                 log.projectData = projectToggl;
+                found = true;
+                foundIssue = true;
                 resolve(parsedIssue[0]);
               } else {
                 log.projectID = null;
@@ -478,13 +515,17 @@ export default {
             }
           });
 
-          axios.get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization':
-                'Basic ' + btoa(_self.togglApiToken + ':api_token')
-            }
-          }).then(function (issue) {
+          if(!found){
+            axios.get('https://api.track.toggl.com/api/v8/projects/' + log.pid, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization':
+                  'Basic ' + btoa(_self.togglApiToken + ':api_token')
+              }
+            }).then(function (issue) {
+              if(_self.breakFetch)
+                return;
+
               _self.projectsToggl.push(issue.data.data);
               const parsedIssue = _self.matchIssueId(issue.data.data.name);
               if (parsedIssue) {
@@ -495,12 +536,15 @@ export default {
                   localLog.projectID = parsedIssue[0];
                   localLog.projectData = issue.data.data;
                 }
-                resolve(parsedIssue[0]);
+                if(!foundIssue)
+                  resolve(parsedIssue[0]);
               } else {
                 log.projectID = null;
-                reject(log);
+                if(!foundIssue)
+                  reject(log);
               }
-          });
+            });
+          }
         } else {
           reject(log);
         }
@@ -521,6 +565,8 @@ export default {
       await axios
         .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue + '/worklog')
         .then(function (response) {
+          if(_self.breakFetch)
+            return;
           let worklogs = response.data.worklogs;
           response.data.issueID = log.issue;
           _self.worklogsJira.push(response.data);
@@ -559,6 +605,8 @@ export default {
         await axios
           .get(_self.jiraUrl + '/rest/api/latest/issue/' + log.issue)
           .then(function (response) {
+            if(_self.breakFetch)
+              return;
             let issueJira = response.data;
             _self.worklogsJira.push(issueJira);
             log.issueJira = issueJira;
@@ -770,16 +818,16 @@ export default {
     },
 
     dayMinus () {
-      if (this.blockFetch) {
-        return;
-      }
+      // if (this.blockFetch) {
+      //   return;
+      // }
       this.moveDays(-1);
     },
 
     dayPlus () {
-      if (this.blockFetch) {
-        return;
-      }
+      // if (this.blockFetch) {
+      //   return;
+      // }
       this.moveDays(1);
     },
 
@@ -1019,7 +1067,7 @@ export default {
       if(!log || log.isSyncedManicTime)
         return;
       const projectID = log && log.projectID != null ? log.projectID : "No Project";
-      const issueID = log && log.projectID != log.issue && log.issue != '' ? (', ' + log.issue) : '';
+      const issueID = log && log.issue != null && log.issue != '' && log.projectID != log.issue ? (', ' + log.issue) : '';
       const description = log.description;
       const start = _self.toJiraDateTime(log.start);
       const duration = log.duration;
@@ -1036,30 +1084,30 @@ export default {
       const timelines = _self.manicTimeTimeline.split(',');
 
       for(let i = 0; i < timelines.length; i++){
-        await _self.pushLogToManicTime(log, timelines[i], data);
+        if(timelines[i] != null && timelines[i] != undefined && timelines[i].length > 5 && data != null && data != undefined)
+          await _self.pushLogToManicTime(log, timelines[i], data, true);
       }
     },
 
     async pushLogToManicTime(log, timeline, data, retry = false){
       const _self = this;
-      const url = _self.manicTimeServer +  "/api/timelines/" + timeline.trim() + "/activities";
+      const url = _self.manicTimeServer +  "/api/timelines/" + timeline + "/activities";
       const headers = { 
         'Authorization': 'Bearer ' + _self.manicTimeToken, 
         'Content-Type': 'application/json'
       };
-      const promise = axios.post(url, data, {headers: headers})
-      .then(function (response) {
+      await axios.post(url, data, {headers: headers})
+      .then(async function (response) {
         log.isSyncedManicTime = true;
       })
-      .catch(function (error) {
+      .catch(async function (error) {
         log.isSyncedManicTime = false;
         console.log(error);
         if(retry){
-          _self.pushLogToManicTimeUnique(log, false);
+          await _self.delay(250);
+          await _self.pushLogToManicTime(log,timeline,data, false);
         }
       });
-
-      return promise;
     },
 
     onlyManicTimePost(){
@@ -1075,7 +1123,7 @@ export default {
       const _self = this;
       if(_self.jiraUrl.includes("xoia") && _self.easterEggs.length > 0){
         const img = document.getElementById('eastereggimg');
-        img.src = "/easteregg/" + this.randomEasterEgg();
+        img.src = "/easteregg/" + _self.randomEasterEgg();
         const modal = document.getElementById("modaleg");
         const modalcontent = document.getElementById("modal-content-eg");
         modalcontent.classList.remove('modalclose');
