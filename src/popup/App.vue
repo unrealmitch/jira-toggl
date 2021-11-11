@@ -13,7 +13,7 @@
                 <md-icon>timer</md-icon>
               </md-button>
             </a>
-            <md-button :disabled="isSaving" class="md-icon-button" @click="refreshEntries">
+            <md-button :disabled="!canUpdate()" class="md-icon-button" @click="refreshEntries">
               <md-icon>autorenew</md-icon>
             </md-button>
             <md-button @click="toggleTheme" class="md-icon-button">
@@ -29,13 +29,13 @@
         </md-toolbar>
       </div>
     </div>
-    <div v-if="!isSaving" class="button-reset-float">
+    <div class="button-reset-float">
       <u @click="moveToday">Reset dates</u>
     </div>
 
     <div class="inner-container">
       <div class="md-layout md-gutter">
-        <md-button :disabled="isSaving" class="md-icon-button material-icons button-navigation-calendar" @click="dayMinus">
+        <md-button :disabled="!canUpdate()" class="md-icon-button material-icons button-navigation-calendar" @click="dayMinus">
           <md-icon>navigate_before</md-icon>
         </md-button>
 
@@ -47,7 +47,7 @@
           <span class="datepicker-label md-caption">End date</span>
           <md-datepicker v-model="endDate" :readonly="blockFetch" md-immediately />
         </div>
-        <md-button :disabled="isSaving" class="md-icon-button material-icons button-navigation-calendar" @click="dayPlus">
+        <md-button :disabled="!canUpdate()" class="md-icon-button material-icons button-navigation-calendar" @click="dayPlus">
           <md-icon>navigate_next</md-icon>
         </md-button>
       </div>
@@ -177,6 +177,7 @@ import moment from 'moment';
 
 const initalStartDate = new Date(moment().startOf('day'));
 const initalEndDate = new Date(moment().endOf('day'));
+const delayAfterUpdate = 300;
 
 export default {
   data () {
@@ -205,6 +206,7 @@ export default {
       msgSnackbar: "Yay! Your entries has been logged to Jira ✌️",
       blockFetch: false,
       breakFetch: false,
+      timeFetch: null,
       weekdayMonday: true,
       saveDates: false,
       useTogglColors: true,
@@ -345,7 +347,16 @@ export default {
           _self.breakFetch = true;
         return;
       }
+      
+      if(!_self.canUpdate()){
+        return;
+      }
 
+      _self.timeFetch = _self.getTime();
+      _self.delay(delayAfterUpdate + 50).then(() => {
+        _self.$forceUpdate();
+      });
+      
       if (_self.saveDates) {
         _self.saveActualDates();
       }
@@ -362,7 +373,6 @@ export default {
 
     async BreakFetch(){
       const _self = this;
-      await _self.delay(200);
       _self.breakFetch = false;
       _self.blockFetch = false;
       _self.refreshEntries();
@@ -370,11 +380,6 @@ export default {
 
     async fetchEntries () {
       let _self = this;
-      if (_self.blockFetch) {
-        return;
-      }else{
-        _self.blockFetch = true;
-      }
 
       const offset = new Date().getTimezoneOffset();
       const sign = offset <= 0 ? '+' : '-';
@@ -461,7 +466,7 @@ export default {
           }else{
             _self.blockFetch = false;
           }
-          
+
         })
         .catch(function (error) {
           _self.blockFetch = false;
@@ -818,28 +823,28 @@ export default {
     },
 
     dayMinus () {
-      // if (this.blockFetch) {
-      //   return;
-      // }
       this.moveDays(-1);
     },
 
     dayPlus () {
-      // if (this.blockFetch) {
-      //   return;
-      // }
       this.moveDays(1);
     },
 
     moveDays (ndays) {
+      if(!this.canUpdate())
+        return;
+
       let newStartDate = moment(this.startDate).add(ndays, 'days');
       let newEndDate = moment(this.endDate).add(ndays, 'days');
       this.startDate = new Date(newStartDate.startOf('day'));
       this.endDate = new Date(newEndDate.startOf('day'));
       this.refreshEntries();
+
     },
 
     moveToday () {
+      if(!this.canUpdate())
+        return;
       this.startDate = new Date(moment().startOf('day'));
       this.endDate = this.startDate;
       this.refreshEntries();
@@ -1331,6 +1336,15 @@ export default {
         });
       }
     },
+
+    canUpdate(){
+      const _self = this;
+      return !_self.isSaving && !_self.breakFetch && (_self.timeFetch == null || new Date(_self.timeFetch + delayAfterUpdate)  < _self.getTime());
+    },
+
+    getTime(){
+      return new Date().getTime();
+    }
 
   }
 };
