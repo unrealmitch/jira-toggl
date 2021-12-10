@@ -7,6 +7,23 @@
             <img src="/icons/jira-toggl_48.png" alt="Avatar">
             <h3 class="md-title">Toggl To Jira</h3>
           </div>
+      
+          <div v-if="holdedEnabled" class="md-toolbar-section-center">
+            <!-- <md-button @click="holdedLogin" class="md-icon-button" color="success">
+              Enter <md-icon>play_arrow</md-icon>
+            </md-button> -->
+            <md-button v-if="!runningHolded" @click="holdedCheckInOut" class="md-raised hd-in">
+            <span style="vertical-align: middle;">Enter  </span> <md-icon style="font-size: 17px !important;">play_arrow</md-icon>
+            </md-button>
+            <md-button v-else @click="holdedCheckInOut" class="md-raised hd-out">
+            <span style="vertical-align: middle;">Exit</span><md-icon class="animate-flicker" style="font-size: 17px !important; margin-right: -10px;">stop</md-icon>
+            </md-button>
+            <div>
+            <span  style="vertical-align: text-bottom;">{{timeHolded}}</span>
+            </div>
+          </div>
+          
+
           <div class="md-toolbar-section-end">
             <a v-if="clockworkEnabled" :href="clockworkUrl()" target="_blank">
               <md-button class="md-icon-button">
@@ -223,6 +240,13 @@ export default {
       manicTimeTimeline: '',
       manicTimeAllowRepost: false,
       allowRepostManicTime: false,
+      holdedEnabled: false,
+      holdedUser: '',
+      holdedPassword: '',
+      holdedStopToggl: false,
+      holdedStartToggl: false,
+      holdedStartTogglTaskDescription: '',
+      holdedToken: '',
       easterEggs:[],
       optionMenuIssue: [
         {
@@ -237,6 +261,11 @@ export default {
         'Content-Type': 'application/json; charset=UTF-8',
         'Accept': 'application/json'
       },
+
+      runningHolded: false,
+      secondsHolded: 0,
+      timeHolded: '',
+      actualEntrieHolded: '',
 
     };
   },
@@ -286,6 +315,13 @@ export default {
         manicTimeToken: '',
         manicTimeTimeline: '',
         manicTimeAllowRepost: false,
+        holdedEnabled: false,
+        holdedUser: '',
+        holdedPassword: '',
+        holdedStopToggl: false,
+        holdedStartToggl: false,
+        holdedStartTogglTaskDescription: '',
+        holdedToken: ''
       })
       .then((setting) => {
         _self.jiraUrl = setting.jiraUrl;
@@ -318,6 +354,13 @@ export default {
         _self.manicTimeToken = setting.manicTimeToken;
         _self.manicTimeTimeline = setting.manicTimeTimeline;
         _self.manicTimeAllowRepost = setting.manicTimeAllowRepost;
+        _self.holdedEnabled = setting.holdedEnabled;
+        _self.holdedUser = setting.holdedUser;
+        _self.holdedPassword = setting.holdedPassword;
+        _self.holdedStopToggl = setting.holdedStopToggl;
+        _self.holdedStartToggl = setting.holdedStartToggl;
+        _self.holdedStartTogglTaskDescription = setting.holdedStartTogglTaskDescription;
+        _self.holdedToken = setting.holdedToken;
 
         _self.parseTransitions(_self.transitions);
       });
@@ -335,6 +378,8 @@ export default {
     if(navigator.userAgent.indexOf('Firefox') !== -1) {
       this.jiraHeaders['User-Agent'] =  'toggl2jira';
     }
+
+    this.holdedGetInfo();
   },
 
   methods: {
@@ -1178,7 +1223,7 @@ export default {
       const log = event.item;
       const option = event.option;
       if(option === _self.optionMenuIssue[0]){
-        _self.optionStartToggl(log);
+        _self.optionStartToggl(log.description, log.pid);
       }else if(option === _self.optionMenuIssue[1]){
         browser.tabs.create({
           url: _self.jiraUrl + '/browse/' + log.issue,
@@ -1191,13 +1236,13 @@ export default {
       }
     },
 
-    async optionStartToggl(log){
+    async optionStartToggl(description, pid = null){
       // if (confirm("Do you want Start Toggl -> " + log.issue + " ?\n" + log.description)) {
         const _self = this;
         const data = JSON.stringify({
           "time_entry": {
-            "description": log.description,
-            "pid": log.pid,
+            "description": description,
+            "pid": pid,
             "tags": [
               "T2J-Created"
             ],
@@ -1218,7 +1263,7 @@ export default {
 
         await axios(config)
         .then(function (response) {
-          _self.msgSnackbar = "Toggl started with <b>" + log.issue + "</b>✌️";
+          _self.msgSnackbar = "Toggl started with <b>" + description + "</b>✌️";
           _self.showSnackbar = true;
         })
         .catch(function (error) {
@@ -1227,6 +1272,59 @@ export default {
           _self.showSnackbar = true;
         });
       // }
+    },
+
+    async optionStopToggl(){
+        const _self = this;
+        const data = {}
+        var axios = require('axios');
+      
+        var config = {
+          method: 'get',
+          url: 'https://api.track.toggl.com/api/v8/time_entries/current',
+          headers: { 
+            'Authorization': 'Basic ' + btoa(_self.togglApiToken + ':api_token'),
+            'Content-Type': 'text/plain'
+          },
+          data: data,
+          payload: data
+        };
+
+        await axios(config)
+        .then(async function (response) {
+          const data = response.data.data;
+          if(data != null && data.id != "undefined" && data.id != undefined){
+            const actualID = data.id;
+            console.log(actualID);
+            config = {
+              method: 'put',
+              url: 'https://api.track.toggl.com/api/v8/time_entries/'+ actualID +'/stop',
+              headers: { 
+                'Authorization': 'Basic ' + btoa(_self.togglApiToken + ':api_token'),
+                'Content-Type': 'text/plain'
+              },
+              data: data,
+              payload: data
+            };
+
+            await axios(config)
+            .then(function (response) {
+              _self.msgSnackbar = "Toggl stopped!";
+              _self.showSnackbar = true;
+            })
+            .catch(function (error) {
+              console.log(error);
+              _self.msgSnackbar = '<span style="color:red;font-weight:bold">ERROR!</span> See console for more details 😢';
+              _self.showSnackbar = true;
+            });
+          }else
+            return;
+        })
+        .catch(function (error) {
+          console.log(error);
+          _self.msgSnackbar = '<span style="color:red;font-weight:bold">ERROR!</span> See console for more details 😢';
+          _self.showSnackbar = true;
+        });
     },
 
     async optionChangeStateJira(log, option, promt = true){
@@ -1344,6 +1442,191 @@ export default {
 
     getTime(){
       return new Date().getTime();
+    },
+
+    holdedGetInfo(){
+      this.holdedLogin();
+    },
+
+    holdedGetTimes(){
+      const _self = this;
+      var axios = require('axios');
+      var qs = require('qs');
+      var data = qs.stringify({
+        'date': Date.now()/1000
+      });
+      var config = {
+        method: 'post',
+        url: 'https://app.holded.com/teamzone/timetracking/tabledata',
+        headers: { 
+          // 'Cookie': 'hrt=' + token + ";", 
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        data : data
+      };
+
+      axios(config)
+      .then(function (response) {
+        if(response.data.length > 0){
+          let lastItem = response.data.at(-1);
+          _self.runningHolded = lastItem.isRunning;
+          
+          if(_self.runningHolded){
+            const start = new Date(lastItem.start);
+            lastItem.time = Math.round((Date.now() - start) / 1000);
+            _self.actualEntrieHolded = lastItem.id;
+          }
+          _self.getTimeDayHolded(response.data, new Date());
+          if(_self.runningHolded){
+            _self.updateSecondsHolded();
+          }
+        }
+      })
+      .catch(function (error) {
+        console.log(error);
+        _self.runningHolded = false;
+      });
+    },
+
+    holdedLogin(){
+      const _self = this;
+      // _self.holdedGetTimes("");
+      // return; 
+      var axios = require('axios');
+      var qs = require('qs');
+      var data = qs.stringify({
+        'email': _self.holdedUser,
+        'pass': _self.holdedPassword,
+        'platform': 'web'
+      });
+      var config = {
+        method: 'post',
+        url: 'https://app.holded.com/internal/auth/get-token',
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded', 
+          'Access-Control-Allow-Origin': '*'
+        },
+        data : data
+      };
+
+      axios(config)
+      .then(function (response) {
+        // let json = JSON.stringify(response.data);
+        let token = response.data.token; //.split('.')[0];
+        _self.holdedGetTimes();
+      })
+      .catch(function (error) {
+        _self.holdedEnabled = false;
+        console.log(error);
+      });
+    },
+
+    holdedCheckInOut(){
+      const _self = this;
+      _self.runningHolded = !_self.runningHolded;
+      if(_self.runningHolded){
+        _self.holdedCheckIn();
+        _self.updateSecondsHolded();
+        if(_self.holdedStartToggl)
+          _self.optionStartToggl(_self.holdedStartTogglTaskDescription);
+      }
+      else{
+        _self.holdedCheckOut();
+        if(_self.holdedStopToggl)
+          _self.optionStopToggl();
+      }
+    },
+
+    holdedCheckIn(){
+      const _self = this;
+      var axios = require('axios');
+      var qs = require('qs');
+      var data = qs.stringify({
+        'timezone': 'Europe/Madrid' 
+      });
+
+      var config = {
+        method: 'post',
+        url: 'https://app.holded.com/teamzone/clockin',
+        data : data
+      };
+
+      axios(config)
+      .then(function (response) {
+        _self.holdedGetTimes();
+      })
+      .catch(function (error) {
+        console.log(error);
+      });
+    },
+
+    holdedCheckOut(){
+      const _self = this;
+      if(_self.actualEntrieHolded == '')
+        return;
+      var axios = require('axios');
+      var qs = require('qs');
+      var data = qs.stringify({
+        'location': '',
+        'trackerId': _self.actualEntrieHolded 
+      });
+
+      var config = {
+        method: 'post',
+        url: 'https://app.holded.com/teamzone/clockout',
+        data : data
+      };
+
+      axios(config)
+      .then(function (response) {
+        _self.holdedGetTimes();
+      })
+      .catch(function (error) {
+        console.log(error);
+      });
+    },
+
+    secondsToTime(duration){
+      const zeroPad = (num) => String(num).padStart(2, '0')
+      duration = Number(duration);
+      let h = Math.floor(duration / 3600);
+      let m = Math.floor((duration % 3600) / 60);
+      let s = duration % 60;
+      return zeroPad(h) + ":" + zeroPad(m) + ":" + zeroPad(s);
+    },
+
+    updateSecondsHolded(){
+      const _self = this;
+      const last = _self.secondsHolded;
+      _self.delay(1000).then(() => {
+        if(_self.runningHolded && _self.secondsHolded == last){
+          _self.secondsHolded++;
+          _self.timeHolded = _self.secondsToTime(_self.secondsHolded);
+          _self.updateSecondsHolded();
+        }
+      });
+    },
+
+    getTimeDayHolded(records, date){
+      const _self = this;
+      let sum = 0;
+
+      for(let i = 0; i < records.length; i++){
+        const record = records[i];
+        const start = new Date(record.start);
+        if(_self.comprateDates(start, date)){
+          sum += record.time;
+        }
+      }
+
+      _self.secondsHolded = sum;
+      _self.timeHolded = _self.secondsToTime(sum);
+    },
+
+    comprateDates(date1, date2){
+      return date1.getDate() == date2.getDate() &&
+      date1.getMonth() == date2.getMonth() &&
+      date1.getFullYear() == date2.getFullYear()
     }
 
   }
@@ -1811,6 +2094,34 @@ svg{
   -webkit-text-fill-color: var(--md-theme-default-background-3, black);
 }
 
+.md-toolbar-section-center {
+  -webkit-box-pack: center;
+  justify-content: center;
+  -webkit-box-ordinal-group: 11;
+  order: 10;
+  display: contents;
+}
+
+.hd-in{
+  background-color: #4181F2 !important;
+  height: 25px !important;
+  margin-top: 5px;
+}
+
+.hd-out{
+  background-color: #d81616 !important;
+  height: 25px !important;
+  margin-top: 5px;
+}
+
+@keyframes fadeIn { 
+  from { opacity: 0; } 
+}
+
+.animate-flicker {
+    animation: fadeIn 1s infinite alternate;
+}
+
 :root {
     --md-theme-default-primary: white;
     --md-theme-default-primary-transparent: rgba(0, 0, 0, 0.85);
@@ -1822,6 +2133,7 @@ svg{
     --md-theme-default-background-tooltip: #555;
     --md-theme-default-accent-on-background: #ff5252;
     --md-theme-default-divider-on-background: rgba(255,255,255,0.12);
+    
 }
 
 [data-theme="lightMode"] {

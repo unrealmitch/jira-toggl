@@ -63,6 +63,26 @@
           </div>
 
           <br>
+          <h3>Holded Options (Beta - Experimental)</h3>
+          <md-checkbox v-model="holdedEnabled">Enable Holded checkin / checkout</md-checkbox>
+          <div v-if="holdedEnabled">
+            <md-field>
+              <label>Holded Username</label>
+              <md-input v-model="holdedUser" />
+            </md-field>
+            <md-field>
+              <label>Holded Password</label>
+              <md-input v-model="holdedPassword" />
+            </md-field>
+            <md-checkbox v-model="holdedStopToggl">Stop toggl on holded check-out</md-checkbox><br>
+            <md-checkbox v-model="holdedStartToggl">Start toggl on holded check-in (and no toggl task running)</md-checkbox><br>
+            <md-field>
+              <label>Holded -> Toggl task description on start</label>
+              <md-input v-model="holdedStartTogglTaskDescription" />
+            </md-field>
+          </div>
+
+          <br>
           <h3>ManicTime Options</h3>
           <md-checkbox v-model="manicTimeEnabled">Enable upload logs to ManicTime Server as Tags</md-checkbox>
           <div v-if="manicTimeEnabled">
@@ -129,6 +149,12 @@ export default {
       manicTimeToken: '',
       manicTimeTimeline: '',
       manicTimeAllowRepost: false,
+      holdedEnabled: false,
+      holdedUser: '',
+      holdedPassword: '',
+      holdedStopToggl: true,
+      holdedStartToggl: true,
+      holdedStartTogglTaskDescription: ''
     };
   },
   created () {
@@ -159,7 +185,13 @@ export default {
       manicTimeServer: '',
       manicTimeToken: '',
       manicTimeTimeline: '',
-      manicTimeAllowRepost: false
+      manicTimeAllowRepost: false,
+      holdedEnabled: false,
+      holdedUser: '',
+      holdedPassword: '',
+      holdedStopToggl: true,
+      holdedStartToggl: true,
+      holdedStartTogglTaskDescription: 'Holded start'
     }).then((setting) => {
       _self.jiraUrl = setting.jiraUrl;
       _self.jiraEmail = setting.jiraEmail;
@@ -186,6 +218,13 @@ export default {
       _self.manicTimeToken = setting.manicTimeToken;
       _self.manicTimeTimeline = setting.manicTimeTimeline;
       _self.manicTimeAllowRepost = setting.manicTimeAllowRepost;
+      _self.holdedEnabled = setting.holdedEnabled;
+      _self.holdedUser = setting.holdedUser;
+      _self.holdedPassword = setting.holdedPassword;
+      _self.holdedStopToggl = setting.holdedStopToggl;
+      _self.holdedStartToggl = setting.holdedStartToggl;
+      _self.holdedStartTogglTaskDescription = setting.holdedStartTogglTaskDescription;
+
     });
   },
   methods: {
@@ -218,7 +257,13 @@ export default {
         manicTimeServer: _self.manicTimeServer,
         manicTimeToken: _self.manicTimeToken,
         manicTimeTimeline: _self.manicTimeTimeline,
-        manicTimeAllowRepost: _self.manicTimeAllowRepost
+        manicTimeAllowRepost: _self.manicTimeAllowRepost,
+        holdedEnabled: _self.holdedEnabled,
+        holdedUser: _self.holdedUser,
+        holdedPassword: _self.holdedPassword,
+        holdedStopToggl: _self.holdedStopToggl,
+        holdedStartToggl: _self.holdedStartToggl,
+        holdedStartTogglTaskDescription: _self.holdedStartTogglTaskDescription
       }).then(() => {
         _self.isSaving = false;
         _self.showSnackbar = true;
