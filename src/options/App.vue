@@ -51,9 +51,15 @@
           <md-checkbox v-if="getJiraIssueInfo" v-model="needConfirmTransition">Request confirmation for issue status change</md-checkbox><br>
           <md-checkbox v-if="getJiraIssueInfo" v-model="allowTransitionByTogglDescription">Change status of issue if toggl description log contains #NameTranstion <i>(like smartcommits, example: TASK-1 #Done)</i></md-checkbox><br>
           <md-field v-if="getJiraIssueInfo">
-            <label>Jira Transitions ( Name:Transition ID; Name2:Transition ID2... ) <i>For classic projects use or add the next:</i> Backlog:11; To Do:61; Blocked:71; In Progress: 31; In Review:51; Done: 41;</label>
+            <label>Jira Transitions ( Name:Transition ID; Name2:Transition ID2... )</label>
             <md-input v-model="transitions" />
           </md-field>
+
+          <span style="line-height:2px;">Help Transitions:<br>
+            <i> *For <b>Classic Projects</b> use or add the next:</i> <b>Backlog:11; To Do:61; Blocked:71; In Progress: 31; In Review:51; Done: 41;</b><br>
+            <i> *For <b>Team Managed Projects</b> use or add the next:</i> <b>To Do:11;In Progress:21;Done:31;</b>
+          </span><br/><br>
+
           <md-checkbox v-model="clockworkEnabled">Button to Jira Plugin (Usually Clockwork Free)</md-checkbox><br>
           <div v-if="clockworkEnabled">
             <md-field>
@@ -178,7 +184,7 @@ export default {
       getJiraIssueInfo: true,
       issueStatusFormat: true,
       reverseLogs: true,
-      transitions: "To Do:11;In Progress:21;Done:31",
+      transitions: "Backlog:11; To Do:61; Blocked:71; In Progress: 31; In Review:51; Done: 41;",
       needConfirmTransition: false,
       allowTransitionByTogglDescription: true,
       manicTimeEnabled: false,

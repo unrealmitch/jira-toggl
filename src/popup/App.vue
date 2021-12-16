@@ -8,10 +8,7 @@
             <h3 class="md-title">Toggl To Jira</h3>
           </div>
       
-          <div v-if="holdedEnabled" class="md-toolbar-section-center">
-            <!-- <md-button @click="holdedLogin" class="md-icon-button" color="success">
-              Enter <md-icon>play_arrow</md-icon>
-            </md-button> -->
+          <div v-if="holdedEnabled && fetchedHolded" class="md-toolbar-section-center">
             <md-button v-if="!runningHolded" @click="holdedCheckInOut" class="md-raised hd-in">
             <span style="vertical-align: middle;">Enter  </span> <md-icon style="font-size: 17px !important;">play_arrow</md-icon>
             </md-button>
@@ -23,7 +20,6 @@
             </div>
           </div>
           
-
           <div class="md-toolbar-section-end">
             <a v-if="clockworkEnabled" :href="clockworkUrl()" target="_blank">
               <md-button class="md-icon-button">
@@ -108,9 +104,6 @@
                 </div>
               </md-table-cell>
               <md-table-cell class="no-wrap">
-                <!-- <span v-b-tooltip.hover.top :title='getStartEnd(log)'>
-                  {{$moment(log.start).format("l")}}
-                </span> -->
                 <div class="tooltip">
                   {{$moment(log.start).format("l")}}
                   <span class="tooltiptext tooltiptext tooltiptextdate">
@@ -263,6 +256,7 @@ export default {
       },
 
       runningHolded: false,
+      fetchedHolded: false,
       secondsHolded: 0,
       timeHolded: '',
       actualEntrieHolded: '',
@@ -1470,6 +1464,7 @@ export default {
         if(response.data.length > 0){
           let lastItem = response.data.at(-1);
           _self.runningHolded = lastItem.isRunning;
+          _self.fetchedHolded = true;
           
           if(_self.runningHolded){
             const start = new Date(lastItem.start);
@@ -1488,37 +1483,44 @@ export default {
       });
     },
 
-    holdedLogin(){
+    async holdedLogin(){
       const _self = this;
-      // _self.holdedGetTimes("");
-      // return; 
-      var axios = require('axios');
+      var axios = require('axios').default;
       var qs = require('qs');
-      var data = qs.stringify({
-        'email': _self.holdedUser,
-        'pass': _self.holdedPassword,
-        'platform': 'web'
-      });
-      var config = {
-        method: 'post',
-        url: 'https://app.holded.com/internal/auth/get-token',
-        headers: { 
-          'Content-Type': 'application/x-www-form-urlencoded', 
-          'Access-Control-Allow-Origin': '*'
-        },
-        data : data
-      };
 
-      axios(config)
-      .then(function (response) {
-        // let json = JSON.stringify(response.data);
-        let token = response.data.token; //.split('.')[0];
-        _self.holdedGetTimes();
-      })
-      .catch(function (error) {
+      await axios.get('https://app.holded.com/login').then(async function (response) {
+        var data = qs.stringify({
+          'email': _self.holdedUser,
+          'pass': _self.holdedPassword,
+          'platform': 'web'
+        });
+
+        var config = {
+          method: 'post',
+          url: 'https://app.holded.com/internal/auth/get-token',
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded', 
+            'Access-Control-Allow-Origin': '*'
+          },
+          data : data
+        };
+
+        axios(config).then(async function (response) {
+          let token = response.data.token; //.split('.')[0];
+          _self.holdedEnabled = true;
+          await axios.get('https://app.holded.com/login/' + token).then(() =>  _self.holdedGetTimes(token));
+        }).catch(function (error) {
+          console.log(error);
+          _self.holdedEnabled = false;
+          _self.runningHolded = false;
+        });
+
+      }).catch(function (error) {
         _self.holdedEnabled = false;
+        _self.runningHolded = false;
         console.log(error);
       });
+
     },
 
     holdedCheckInOut(){
