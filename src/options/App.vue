@@ -27,14 +27,15 @@
           </md-field>
           <md-field>
             <label>Toggl API token</label>
-            <md-input v-model="togglApiToken" />
+            <md-input v-model="togglApiToken" type="password"/>
           </md-field>
           <br>
           <h3>Options</h3>
           <md-checkbox v-model="jiraMerge">Merge time entries with same comment</md-checkbox>
           <!-- <md-checkbox v-model="allowNumbersInId">Allow numbers in Project ID</md-checkbox> -->
-          <md-checkbox v-model="jiraIssueInDescription">Parse Jira issue from description</md-checkbox>
-          <md-checkbox v-model="worklogWihtoutDescription">Don't include Issue ID in worklog</md-checkbox><br>
+          <md-checkbox v-model="jiraIssueInDescription">Parse Jira issue from description</md-checkbox><br>
+          <md-checkbox v-model="worklogWihtoutDescription">Don't include Issue ID in worklog</md-checkbox>
+          <md-checkbox v-model="includeTogglTags">Include Toggl Tags in worklogs</md-checkbox><br>
           <md-checkbox v-model="worklogDescriptionSplit">Split worklog description from first occurrence of:</md-checkbox>
           <input v-model="stringSplit" placeholder="Searched string to split" style="contain: content;">
           <br><br>
@@ -78,7 +79,7 @@
             </md-field>
             <md-field>
               <label>Holded Password</label>
-              <md-input v-model="holdedPassword" />
+              <md-input v-model="holdedPassword" type="password" />
             </md-field>
             <md-checkbox v-model="holdedStopToggl">Stop toggl on holded check-out</md-checkbox><br>
             <md-checkbox v-model="holdedStartToggl">Start toggl on holded check-in (and no toggl task running)</md-checkbox><br>
@@ -135,6 +136,7 @@ export default {
       worklogWihtoutDescription: true,
       worklogDescriptionSplit: false,
       allowNumbersInId: true,
+      includeTogglTags: true,
       clockworkEnabled: false,
       stringSplit: ':',
       togglApiToken: '',
@@ -174,6 +176,7 @@ export default {
       worklogWihtoutDescription: true,
       worklogDescriptionSplit: false,
       allowNumbersInId: true,
+      includeTogglTags: true,
       clockworkEnabled: false,
       stringSplit: ':',
       togglApiToken: '',
@@ -206,6 +209,7 @@ export default {
       _self.worklogWihtoutDescription = setting.worklogWihtoutDescription;
       _self.worklogDescriptionSplit = setting.worklogDescriptionSplit;
       _self.allowNumbersInId = setting.allowNumbersInId;
+      _self.includeTogglTags = setting.includeTogglTags;
       _self.clockworkEnabled = setting.clockworkEnabled;
       _self.stringSplit = setting.stringSplit;
       _self.togglApiToken = setting.togglApiToken;
@@ -246,6 +250,7 @@ export default {
         worklogWihtoutDescription: _self.worklogWihtoutDescription,
         worklogDescriptionSplit: _self.worklogDescriptionSplit,
         allowNumbersInId: _self.allowNumbersInId,
+        includeTogglTags: _self.includeTogglTags,
         clockworkEnabled: _self.clockworkEnabled,
         stringSplit: _self.stringSplit,
         togglApiToken: _self.togglApiToken,

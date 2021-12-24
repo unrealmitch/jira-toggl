@@ -100,7 +100,7 @@
               <md-table-cell class="row-description">
                 <div class="tooltip">
                   <p><span v-html="getLogDescriptionPanel(log)" @contextmenu.prevent.stop="menuIssueClicked($event, log)"></span></p>
-                  <span class="tooltiptext tooltiptext-top tooltiptextmax">{{getProjectInfo(log)}}</span>
+                  <span class="tooltiptext tooltiptext-top tooltiptextmax" v-html="getProjectInfo(log)"></span>
                 </div>
               </md-table-cell>
               <md-table-cell class="no-wrap">
@@ -208,6 +208,7 @@ export default {
       worklogWihtoutDescription: true,
       worklogDescriptionSplit: true,
       allowNumbersInId: true,
+      includeTogglTags: true,
       clockworkEnabled: false,
       stringSplit: ':',
       togglApiToken: '',
@@ -289,6 +290,7 @@ export default {
         worklogWihtoutDescription: true,
         worklogDescriptionSplit: true,
         allowNumbersInId: true,
+        includeTogglTags: true,
         clockworkEnabled: false,
         stringSplit: ':',
         togglApiToken: '',
@@ -325,6 +327,7 @@ export default {
         _self.worklogWihtoutDescription = setting.worklogWihtoutDescription;
         _self.worklogDescriptionSplit = setting.worklogDescriptionSplit;
         _self.allowNumbersInId = setting.allowNumbersInId;
+        _self.includeTogglTags = setting.includeTogglTags;
         _self.clockworkEnabled = setting.clockworkEnabled;
         _self.stringSplit = setting.stringSplit;
         _self.togglApiToken = setting.togglApiToken;
@@ -686,9 +689,9 @@ export default {
             data: {
               timeSpentSeconds: log.duration,
               comment: _self.processJiraDescription(
-                _self.worklogWihtoutDescription
+                (_self.worklogWihtoutDescription
                   ? log.description.replace(log.issue, '')
-                  : log.description
+                  : log.description) + _self.getTagsToggl(log)
               ),
               started: _self.toJiraDateTime(log.start)
             },
@@ -971,15 +974,27 @@ export default {
       }
     },
 
+    getTagsToggl(log, head = "\n#", separation = "\n#"){
+      if(this.includeTogglTags && log != null && log.tags != null && log.tags != undefined && log.tags.length > 0){
+        let tags = head;
+        tags += log.tags.join(separation);
+        return tags;
+      }
+
+      return "";
+    },
+
     getProjectInfo(log){
+
+      let project = "No Project Info (Toggl)"
       if(log.projectData != null && log.projectData.name && log.projectData.name.length > 0){
         if(log.projectData.actual_hours)
-          return log.projectData.name + " [" + log.projectData.actual_hours + "h]";
+          project = log.projectData.name + " [" + log.projectData.actual_hours + "h]";
         else
-          return log.projectData.name;
-      }else{
-        return "No Project Info (Toggl)";
+          project =  log.projectData.name;
       }
+
+      return project + this.getTagsToggl(log,"<br>\n#",", ");
     },
 
     async getIssuesJira(){
