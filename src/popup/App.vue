@@ -205,6 +205,7 @@ export default {
       jiraEmail: '',
       jiraMerge: true,
       jiraIssueInDescription: true,
+      jiraLogged: false,
       worklogWihtoutDescription: true,
       worklogDescriptionSplit: true,
       allowNumbersInId: true,
@@ -437,6 +438,36 @@ export default {
         .utc(true)
         .toISOString(true)
         .replace('+00:00', timezone);
+
+      if(!this.jiraLogged){
+        await axios.get(_self.jiraUrl,  {
+          headers: {
+            'Access-Control-Allow-Origin' : '*',
+            'Access-Control-Allow-Methods':'GET,PUT,POST,DELETE,PATCH,OPTIONS',
+          },
+          withCredentials: false
+        })
+        .then(async function (answer) {
+          if(answer.status == 200){
+            if(answer.data.includes("<title>Log in with Atlassian account</title>")){
+              _self.errorMessage = 'No user logged in jira.<a href="' + _self.jiraUrl +  '" target="_blank"> Log in here</a>';
+              _self.showSnackbar = true;
+              _self.blockFetch = false;
+            }else{
+              _self.jiraLogged = true;
+            }
+          }else{
+            _self.errorMessage = 'Jira Error: ' + answer.status + ' ' + answer.statusText;
+            _self.showSnackbar = true;
+            _self.blockFetch = false;
+            return;
+          }
+        });
+      }
+
+      if(!_self.jiraLogged){
+        return;
+      }
 
       await axios
         .get('https://api.track.toggl.com/api/v8/time_entries', {
@@ -1756,7 +1787,7 @@ img {
 }
 
 .md-toolbar.md-theme-default.md-accent{
-  position: sticky;
+  position: absolute;
   bottom: 0;
   z-index: 10;
 }

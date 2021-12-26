@@ -7,6 +7,8 @@
     "https://www.toggl.com/*",
     "https://toggl.com/*",
     "https://*.atlassian.net/*",
+    "https://*.atlassian.com/*",
+    "https://id.atlassian.com",
     "http://www.toggl.com/*",
     "http://*.atlassian.net/*",
     "http://*.mmosquera.es/*",
