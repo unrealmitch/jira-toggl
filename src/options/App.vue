@@ -42,6 +42,7 @@
           <h3>Extra Options</h3>
           <md-checkbox v-model="saveDates">Save dates (Persistent start and end dates)</md-checkbox><br>
           <md-checkbox v-model="weekdayMonday">Start week on monday</md-checkbox><br>
+          <md-checkbox v-model="jumpWeekend">Jump Weekends with calendar arrows</md-checkbox><br>
           <md-checkbox v-model="useTogglColors">Use Toggl project colors in issue link</md-checkbox><br>
           <md-checkbox v-model="reverseLogs">Show newest logs at top (logs date in descending order)</md-checkbox><br>
 
@@ -83,9 +84,14 @@
             </md-field>
             <md-checkbox v-model="holdedStopToggl">Stop toggl on holded check-out</md-checkbox><br>
             <md-checkbox v-model="holdedStartToggl">Start toggl on holded check-in (and no toggl task running)</md-checkbox><br>
+            <md-checkbox v-model="holdedForceStartToggl">Force start toggl on holded check-in (altought already toggl task is running)</md-checkbox><br>
             <md-field>
               <label>Holded -> Toggl task description on start</label>
               <md-input v-model="holdedStartTogglTaskDescription" />
+            </md-field>
+            <md-field>
+              <label>Holded -> Toggl project ID on start</label>
+              <md-input v-model="holdedStartTogglProjectId" />
             </md-field>
           </div>
 
@@ -144,6 +150,7 @@ export default {
       showSnackbar: false,
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
       weekdayMonday: true,
+      jumpWeekend: true,
       saveDates: false,
       useTogglColors: true,
       getJiraIssueInfo: true,
@@ -162,7 +169,9 @@ export default {
       holdedPassword: '',
       holdedStopToggl: true,
       holdedStartToggl: true,
-      holdedStartTogglTaskDescription: ''
+      holdedForceStartToggl: false,
+      holdedStartTogglTaskDescription: '',
+      holdedStartTogglProjectId: '',
     };
   },
   created () {
@@ -182,6 +191,7 @@ export default {
       togglApiToken: '',
       jiraPlugin: '{jiraUrl}/plugins/servlet/ac/clockwork-free-cloud/clockwork-mywork#!reportName=Toggle2Jira&scope%5BstartingAt%5D={startDate}&scope%5BendingAt%5D={endDate}&selectedBreakdowns%5B%5D=projects&selectedBreakdowns%5B%5D=issues&period=PERIOD_DAY',
       weekdayMonday: true,
+      jumpWeekend: true,
       saveDates: false,
       useTogglColors: true,
       getJiraIssueInfo: true,
@@ -200,7 +210,9 @@ export default {
       holdedPassword: '',
       holdedStopToggl: true,
       holdedStartToggl: true,
-      holdedStartTogglTaskDescription: 'Holded start'
+      holdedForceStartToggl: false,
+      holdedStartTogglTaskDescription: 'Holded start',
+      holdedStartTogglProjectId: ''
     }).then((setting) => {
       _self.jiraUrl = setting.jiraUrl;
       _self.jiraEmail = setting.jiraEmail;
@@ -215,6 +227,7 @@ export default {
       _self.togglApiToken = setting.togglApiToken;
       _self.jiraPlugin = setting.jiraPlugin;
       _self.weekdayMonday = setting.weekdayMonday;
+      _self.jumpWeekend = setting.jumpWeekend;
       _self.saveDates = setting.saveDates;
       _self.useTogglColors = setting.useTogglColors;
       _self.getJiraIssueInfo = setting.getJiraIssueInfo;
@@ -233,7 +246,9 @@ export default {
       _self.holdedPassword = setting.holdedPassword;
       _self.holdedStopToggl = setting.holdedStopToggl;
       _self.holdedStartToggl = setting.holdedStartToggl;
+      _self.holdedForceStartToggl = setting.holdedForceStartToggl;
       _self.holdedStartTogglTaskDescription = setting.holdedStartTogglTaskDescription;
+      _self.holdedStartTogglProjectId = setting.holdedStartTogglProjectId;
 
     });
   },
@@ -256,6 +271,7 @@ export default {
         togglApiToken: _self.togglApiToken,
         jiraPlugin: _self.jiraPlugin,
         weekdayMonday: _self.weekdayMonday,
+        jumpWeekend: _self.jumpWeekend,
         saveDates: _self.saveDates,
         useTogglColors: _self.useTogglColors,
         getJiraIssueInfo: _self.getJiraIssueInfo,
@@ -274,7 +290,9 @@ export default {
         holdedPassword: _self.holdedPassword,
         holdedStopToggl: _self.holdedStopToggl,
         holdedStartToggl: _self.holdedStartToggl,
-        holdedStartTogglTaskDescription: _self.holdedStartTogglTaskDescription
+        holdedForceStartToggl: _self.holdedForceStartToggl,
+        holdedStartTogglTaskDescription: _self.holdedStartTogglTaskDescription,
+        holdedStartTogglProjectId: _self.holdedStartTogglProjectId
       }).then(() => {
         _self.isSaving = false;
         _self.showSnackbar = true;

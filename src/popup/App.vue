@@ -53,11 +53,11 @@
         </md-button>
 
         <div class="md-layout-item">
-          <span class="datepicker-label md-caption">Start date</span>
+          <span class="datepicker-label md-caption">Start date: {{startDateDay}}</span>
           <md-datepicker v-model="startDate" :readonly="blockFetch" md-immediately />
         </div>
         <div class="md-layout-item">
-          <span class="datepicker-label md-caption">End date</span>
+          <span class="datepicker-label md-caption">End date: {{startDateDay}}</span>
           <md-datepicker v-model="endDate" :readonly="blockFetch" md-immediately />
         </div>
         <md-button :disabled="!canUpdate()" class="md-icon-button material-icons button-navigation-calendar" @click="dayPlus">
@@ -196,6 +196,8 @@ export default {
       syncAllLogs: false,
       startDate: initalStartDate,
       endDate: initalEndDate,
+      startDateDay : "",
+      endDateDay: "",
       logs: [],
       projectsToggl: [],
       worklogsJira: [],
@@ -220,6 +222,7 @@ export default {
       breakFetch: false,
       timeFetch: null,
       weekdayMonday: true,
+      jumpWeekend: true,
       saveDates: false,
       useTogglColors: true,
       getJiraIssueInfo: true,
@@ -240,7 +243,9 @@ export default {
       holdedPassword: '',
       holdedStopToggl: false,
       holdedStartToggl: false,
+      holdedForceStartToggl: false,
       holdedStartTogglTaskDescription: '',
+      holdedStartTogglProjectId: '',
       holdedToken: '',
       easterEggs:[],
       optionMenuIssue: [
@@ -263,6 +268,8 @@ export default {
       timeHolded: '',
       actualEntrieHolded: '',
 
+      includeInvisibleFirmT2J: false,
+      invisibleFirm: "\u0020"
     };
   },
 
@@ -297,6 +304,7 @@ export default {
         togglApiToken: '',
         jiraPlugin: '',
         weekdayMonday: true,
+        jumpWeekend: true,
         startDate: initalStartDate,
         endDate: initalEndDate,
         saveDates: false,
@@ -317,7 +325,9 @@ export default {
         holdedPassword: '',
         holdedStopToggl: false,
         holdedStartToggl: false,
+        holdedForceStartToggl: false,
         holdedStartTogglTaskDescription: '',
+        holdedStartTogglProjectId: '',
         holdedToken: ''
       })
       .then((setting) => {
@@ -334,6 +344,7 @@ export default {
         _self.togglApiToken = setting.togglApiToken;
         _self.jiraPlugin = setting.jiraPlugin;
         _self.weekdayMonday = setting.weekdayMonday;
+        _self.jumpWeekend = setting.jumpWeekend;
         _self.saveDates = setting.saveDates;
         _self.useTogglColors = setting.useTogglColors;
         _self.getJiraIssueInfo = setting.getJiraIssueInfo;
@@ -357,7 +368,9 @@ export default {
         _self.holdedPassword = setting.holdedPassword;
         _self.holdedStopToggl = setting.holdedStopToggl;
         _self.holdedStartToggl = setting.holdedStartToggl;
+        _self.holdedForceStartToggl = setting.holdedForceStartToggl;
         _self.holdedStartTogglTaskDescription = setting.holdedStartTogglTaskDescription;
+        _self.holdedStartTogglProjectId = setting.holdedStartTogglProjectId;
         _self.holdedToken = setting.holdedToken;
 
         _self.parseTransitions(_self.transitions);
@@ -439,6 +452,9 @@ export default {
         .toISOString(true)
         .replace('+00:00', timezone);
 
+      _self.startDateDay = ' W' + moment(this.startDate).weeks() + " - " + moment(this.startDate).format('dddd');
+      _self.endDateDay  = ' W' + moment(this.endDate).weeks() + " - " + moment(this.endDate).format('dddd');
+
       if(!this.jiraLogged){
         await axios.get(_self.jiraUrl,  {
           headers: {
@@ -497,6 +513,9 @@ export default {
                 log.issue = issueName;
                 log.checked = '';
 
+                if(_self.includeInvisibleFirmT2J)
+                    log.description = log.description + _self.invisibleFirm;
+
                 if (_self.jiraMerge) {
                   let logIndex = _self.logs.findIndex(
                     (i) => i.description === log.description && i.issue === issueName
@@ -505,6 +524,7 @@ export default {
                     _self.logs[logIndex].duration =
                       _self.logs[logIndex].duration + log.duration;
                   } else {
+                    log.description =  + log.description;
                     _self.logs.push(log);
                   }
                 } else {
@@ -649,6 +669,7 @@ export default {
           response.data.issueID = log.issue;
           _self.worklogsJira.push(response.data);
           worklogs.forEach(function (worklog) {
+            console.log(worklog.comment);
             _self.findLogInWorklogs(log, worklog);
             _self.$forceUpdate();
           });
@@ -771,8 +792,12 @@ export default {
       }
     },
 
+    noEmptyDescription (log) {
+      return log.description != null && log.description.length > 0 && log.description != '' && log.description != this.invisibleFirm;
+    },
+
     getDescriptionID(log){
-      if(log.description != null && log.description != ''){
+      if(this.noEmptyDescription(log)){
         const parsedIssue = _self.matchIssueId(log.description);
         if (parsedIssue) {
           return parsedIssue[0];
@@ -896,11 +921,22 @@ export default {
     },
 
     dayMinus () {
-      this.moveDays(-1);
+      const weekday = (moment(this.startDate).add(-1, 'days').isoWeekday() - 1) % 7;
+      console.log(weekday);
+      if(this.jumpWeekend && weekday > 4){
+        this.moveDays(-(9 - weekday));
+      }else{
+        this.moveDays(-1);
+      }
     },
 
     dayPlus () {
-      this.moveDays(1);
+      const weekday = (moment(this.startDate).add(1, 'days').isoWeekday() - 1) % 7;
+      if(this.jumpWeekend && weekday > 4){
+        this.moveDays(8-weekday);
+      }else{
+        this.moveDays(1);
+      }
     },
 
     moveDays (ndays) {
@@ -956,7 +992,7 @@ export default {
     },
 
     getLogDescriptionPanel(log){
-      if(log.description && log.description.length > 0){
+      if(this.noEmptyDescription(log)){
         return "<p>" + log.description + "</p>";
       }else if(log.projectData != null && log.projectData.name && log.projectData.name.length > 0){
         return '<i><p style="opacity:60%;">' + log.projectData.name + "</p></i>";
@@ -1263,7 +1299,7 @@ export default {
       const log = event.item;
       const option = event.option;
       if(option === _self.optionMenuIssue[0]){
-        _self.optionStartToggl(log.description, log.pid);
+        _self.optionStartToggl(log.description, log.pid, true);
       }else if(option === _self.optionMenuIssue[1]){
         browser.tabs.create({
           url: _self.jiraUrl + '/browse/' + log.issue,
@@ -1276,7 +1312,7 @@ export default {
       }
     },
 
-    async optionStartToggl(description, pid = null){
+    async optionStartToggl(description, pid = null, forceStart = false){
       // if (confirm("Do you want Start Toggl -> " + log.issue + " ?\n" + log.description)) {
         const _self = this;
         const data = JSON.stringify({
@@ -1290,7 +1326,31 @@ export default {
           }
         })
         var axios = require('axios');
-        var config = {
+        var configGetActual = {
+          method: 'get',
+          url: 'https://api.track.toggl.com/api/v8/time_entries/current',
+          headers: { 
+            'Authorization': 'Basic ' + btoa(_self.togglApiToken + ':api_token'),
+            'Content-Type': 'text/plain'
+          }
+        };
+
+        let exist = false;
+        if(!forceStart){
+          await axios(configGetActual).then(async function (response) {
+            const data = response.data.data;
+            if(data != null && data.id != "undefined" && data.id != undefined){
+              console.log("Dont Start!");
+              exist = true;
+              return;
+            }
+          });
+        }
+
+        if(exist)
+          return;
+
+        var configCreate = {
           method: 'post',
           url: 'https://api.track.toggl.com/api/v8/time_entries/start',
           headers: { 
@@ -1301,7 +1361,7 @@ export default {
           payload: data
         };
 
-        await axios(config)
+        await axios(configCreate)
         .then(function (response) {
           _self.msgSnackbar = "Toggl started with <b>" + description + "</b>✌️";
           _self.showSnackbar = true;
@@ -1335,7 +1395,6 @@ export default {
           const data = response.data.data;
           if(data != null && data.id != "undefined" && data.id != undefined){
             const actualID = data.id;
-            console.log(actualID);
             config = {
               method: 'put',
               url: 'https://api.track.toggl.com/api/v8/time_entries/'+ actualID +'/stop',
@@ -1576,7 +1635,7 @@ export default {
         _self.holdedCheckIn();
         _self.updateSecondsHolded();
         if(_self.holdedStartToggl)
-          _self.optionStartToggl(_self.holdedStartTogglTaskDescription);
+          _self.optionStartToggl(_self.holdedStartTogglTaskDescription, _self.holdedStartTogglProjectId, _self.holdedForceStartToggl);
       }
       else{
         _self.holdedCheckOut();
