@@ -105,7 +105,7 @@
               </md-table-cell>
               <md-table-cell class="no-wrap">
                 <div class="tooltip">
-                  {{$moment(log.start).format("l")}}
+                  {{$moment(log.start).format("YY-MM-DD")}}
                   <span class="tooltiptext tooltiptext tooltiptextdate">
                     {{getStartEnd(log)}}
                   </span>
@@ -276,11 +276,17 @@ export default {
   watch: {
     startDate: function (newVal, oldVal) {
       if (newVal.toString() !== oldVal.toString()) {
+        if(newVal > this.endDate) {
+          this.endDate = newVal;
+        }
         this.refreshEntries();
       }
     },
     endDate: function (newVal, oldVal) {
       if (newVal.toString() !== oldVal.toString()) {
+        if(newVal < this.startDate) {
+          this.startDate = newVal;
+        }
         this.refreshEntries();
       }
     }
@@ -825,7 +831,8 @@ export default {
     },
 
     isSameStart (worklog, log) {
-      return new Date(worklog.started).getTime() === new Date(log.start).getTime();
+      // return new Date(worklog.started).getTime() === new Date(log.start).getTime();
+      return new Date(worklog.started).toISOString() === new Date(log.start).toISOString();
     },
 
     toJiraDateTime (date) {
