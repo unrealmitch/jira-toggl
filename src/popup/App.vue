@@ -7,8 +7,11 @@
             <img src="/icons/jira-toggl_48.png" alt="Avatar">
             <h3 class="md-title">Toggl To Jira</h3>
           </div>
-      
-          <div v-if="holdedEnabled && fetchedHolded" class="md-toolbar-section-center">
+          <div v-if="holdedEnabled && holdedLogged && fetchedHolded" class="md-toolbar-section-center">
+            <md-button v-if="!runningHolded && timeHolded == '00:00:00'" @click="holdedCheckInRemote" class="md-raised hd-in-remote">
+              <span style="vertical-align: middle; font-size: 8px">Remote </span> <md-icon style="font-size: 12px !important; width: 10px; min-width: 0px;">play_arrow</md-icon>
+            </md-button>
+
             <md-button v-if="!runningHolded" @click="holdedCheckInOut" class="md-raised hd-in">
             <span style="vertical-align: middle;">Enter  </span> <md-icon style="font-size: 17px !important;">play_arrow</md-icon>
             </md-button>
@@ -16,7 +19,7 @@
             <span style="vertical-align: middle;">Exit</span><md-icon class="animate-flicker" style="font-size: 17px !important; margin-right: -10px;">stop</md-icon>
             </md-button>
             <div>
-            <span  style="vertical-align: text-bottom;">{{timeHolded}}</span>
+            <span  style="vertical-align: text-bottom; margin-left: 10px;">{{timeHolded}}</span>
             </div>
           </div>
           
@@ -239,6 +242,7 @@ export default {
       manicTimeAllowRepost: false,
       allowRepostManicTime: false,
       holdedEnabled: false,
+      holdedLogged : false,
       holdedUser: '',
       holdedPassword: '',
       holdedStopToggl: false,
@@ -380,6 +384,7 @@ export default {
         _self.holdedToken = setting.holdedToken;
 
         _self.parseTransitions(_self.transitions);
+        _self.holdedGetInfo();
       });
   },
   
@@ -395,8 +400,6 @@ export default {
     if(navigator.userAgent.indexOf('Firefox') !== -1) {
       this.jiraHeaders['User-Agent'] =  'toggl2jira';
     }
-
-    this.holdedGetInfo();
   },
 
   methods: {
@@ -1551,7 +1554,9 @@ export default {
     },
 
     holdedGetInfo(){
-      this.holdedLogin();
+      const _self = this;
+      if(_self.holdedEnabled)
+        _self.holdedLogin();
     },
 
     holdedGetTimes(){
@@ -1619,16 +1624,16 @@ export default {
 
         axios(config).then(async function (response) {
           let token = response.data.token; //.split('.')[0];
-          _self.holdedEnabled = true;
+          _self.holdedLogged = true;
           await axios.get('https://app.holded.com/login/' + token).then(() =>  _self.holdedGetTimes(token));
         }).catch(function (error) {
           console.log(error);
-          _self.holdedEnabled = false;
+          _self.holdedLogged = false;
           _self.runningHolded = false;
         });
 
       }).catch(function (error) {
-        _self.holdedEnabled = false;
+        _self.holdedLogged = false;
         _self.runningHolded = false;
         console.log(error);
       });
@@ -1668,6 +1673,39 @@ export default {
       axios(config)
       .then(function (response) {
         _self.holdedGetTimes();
+      })
+      .catch(function (error) {
+        console.log(error);
+      });
+    },
+
+    holdedCheckInRemote(){
+      const _self = this;
+      var axios = require('axios');
+      var qs = require('qs');
+      var data = qs.stringify({
+        'timeofftype': ' 5e42eb816a972851f04154e8',
+        'timeoffname': ' Teletrabajo',
+        'desc': 'Automatic Toggl2Jira',
+        'start': moment().format('DD/MM/YYYY'),
+        'end': ' ',
+        'leaveperiod': ' one',
+        'dayperiod': '' 
+      });
+
+      var config = {
+        method: 'post',
+        url: 'https://app.holded.com/teamzone/absences/save',
+          headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded', 
+        },
+        data : data
+      };
+
+      axios(config)
+      .then(function (response) {
+        console.log(response);
+        _self.holdedCheckIn();
       })
       .catch(function (error) {
         console.log(error);
@@ -2218,6 +2256,13 @@ svg{
 
 .hd-in{
   background-color: #4181F2 !important;
+  height: 25px !important;
+  margin-top: 5px;
+}
+
+.hd-in-remote{
+  min-width: 0px !important;
+  background-color: #0d8a17 !important;
   height: 25px !important;
   margin-top: 5px;
 }
